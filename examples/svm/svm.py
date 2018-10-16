@@ -73,7 +73,7 @@ def main(params):
     # This can be shortened to `svc = SVC(**kernel_params)`
     svc = SVC(kernel=kernel_params['kernel'],
               C=kernel_params['C'],
-              gamma=kernel_params['gamma'] if 'gamma' in kernel_params else auto,
+              gamma=kernel_params['gamma'] if 'gamma' in kernel_params else 'auto',
               coef0=kernel_params['coef0'] if 'coef0' in kernel_params else 0,
               degree=kernel_params['degree'] if 'degree' in kernel_params else 3)
 

@@ -5,4 +5,5 @@
 
 # For this task, activate an environment that has scikit-learn installed.
 
-python svm.py
+module add python/3.6.4
+python3 svm.py
