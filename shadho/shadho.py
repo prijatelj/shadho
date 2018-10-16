@@ -341,14 +341,14 @@ class Shadho(object):
             model_ids = [mid for mid in self.backend.model_ids]
            
             # Clear the current assignments
-            for cc in self.ccs:
-                cc.clear()
+            for key in list(self.ccs.keys()):
+                self.ccs[key].clear()
 
             # Determine if the number of compute classes or the number of
             # model ids is larger
             ccids = list(self.ccs.keys())
-            larger = model_ids if len(self.model_ids) >= len(ccids) else ccids
-            smaller = model_ids if larger == model_ids else ccids
+            larger = model_ids if len(model_ids) >= len(ccids) else ccids
+            smaller = ccids if larger == model_ids else model_ids
 
             # Assign models to CCs such that each model is assigned to at
             # least two CCs.
