@@ -357,6 +357,7 @@ class Shadho(object):
             x = float(len(larger)) / float(len(smaller))
             y = x - 1  # Current step index (offset by 1 for 0-indexing)
             j = 0  # Current index of `smaller`
+            m = len(smaller) / 2
             n = len(larger) / 2  # Halfway point for second assignment
 
             for i in range(len(larger)):
@@ -365,11 +366,14 @@ class Shadho(object):
                     j += 1
                     y += x
 
-                # Add the model to the current CC. If i <= n, add the model to
-                # the next CC as well; if i > n, add to the previous CC.
+                # Add the model to the current CC.
+                # If cc_idx < half_of_num_ccs:
+                #     add model to cc at cc_idx + 1.
+                # Else:
+                #     add model to cc at cc_idx - 1
                 if smaller[j] in self.ccs:
                     self.ccs[smaller[j]].add_model(self.backend[larger[i]])
-                    if i <= n:
+                    if j < m:
                         self.ccs[smaller[j + 1]].add_model(
                             self.backend[larger[i]])
                     else:
@@ -377,12 +381,12 @@ class Shadho(object):
                             self.backend[larger[i]])
                 else:
                     self.ccs[larger[i]].add_model(self.backend[smaller[j]])
-                    if i <= n:
-                        self.ccs[larger[i]].add_model(
-                            self.backend[smaller[j + 1]])
+                    if i < n:
+                        self.ccs[larger[i + 1]].add_model(
+                            self.backend[smaller[j]])
                     else:
-                        self.ccs[larger[i]].add_model(
-                            self.backend[smaller[j - 1]])
+                        self.ccs[larger[i - 1]].add_model(
+                            self.backend[smaller[j]])
 
     def success(self, tag, loss, results):
         """Handle successful task completion.
