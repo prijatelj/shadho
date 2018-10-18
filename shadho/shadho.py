@@ -339,7 +339,7 @@ class Shadho(object):
             # get the updated order.
             self.backend.sort_models()
             model_ids = [mid for mid in self.backend.model_ids]
-           
+
             # Clear the current assignments
             for key in list(self.ccs.keys()):
                 self.ccs[key].clear()
@@ -352,7 +352,7 @@ class Shadho(object):
 
             # Assign models to CCs such that each model is assigned to at
             # least two CCs.
-            
+
             # Steps between `smaller` index increment
             x = float(len(larger)) / float(len(smaller))
             y = x - 1  # Current step index (offset by 1 for 0-indexing)
@@ -411,7 +411,7 @@ class Shadho(object):
         result_id, model_id, ccid = tag.split('.')
 
         # Update the DB with the result
-        self.ccs[ccid].register_result(model_id, result_id, loss, results)
+        self.backend.register_result(model_id, result_id, loss, results)
 
         # Reassign models to CCs at some frequency
         if self.backend.result_count % 10 == 0:
