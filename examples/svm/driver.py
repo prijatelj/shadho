@@ -42,8 +42,9 @@ if __name__ == '__main__':
     }
 
     # Set up the SHADHO driver like usual
-    opt = Shadho('bash svm_task.sh', space, timeout=600)
-    opt.config.workqueue.name = 'shadho_svm_ex'
+    opt = Shadho('bash svm_task.sh', space, timeout=3600)
+    opt.config.workqueue.name = 'abansal1_rerun'
+    opt.config.workqueue.port = 0
 
     # Add the task files to the optimizer
     opt.add_input_file('svm_task.sh')
