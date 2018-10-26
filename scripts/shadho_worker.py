@@ -19,7 +19,7 @@ try:
 except ImportError:
     import pickle
 import tarfile
-
+import resource
 
 DEFAULTS = {
     'global': {
@@ -108,12 +108,17 @@ def run(task, cfgpath='.shadhorc'):
 
         # Run the task and save the results in a format `shahdo` recognizes.
         result = task(spec)
+        res=resource.getrusage(resource.RUSAGE_SELF)
+        lres=[]
+        for r in res:
+            lres.append(r)
+        dres=dict(enumerate(lres,100))
+        result.update(dres)
         if isinstance(result, float):
             result = {cfg['global']['optimize']: result}
-
         # Dump the results to file.
         with open(cfg['global']['result_file'], 'w') as f:
-            json.dump(result, f)
+            json.dump(result,f)
 
         # Compress into the expected output file.
         ext = os.path.splitext(cfg['global']['output'])

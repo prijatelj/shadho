@@ -16,3 +16,4 @@ results.json
 build/
 dist/
 *venv/
+examples/svm/driver.py
