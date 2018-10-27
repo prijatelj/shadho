@@ -330,6 +330,13 @@ class Shadho(object):
         `shadho.ComputeClass`
         `pyrameter.ModelGroup`
         """
+        # NEWFANGLED WAY: assign COPIES of ALL models to ALL compute classes
+        for key in list(self.ccs.keys()):
+            self.ccs[key].clear()
+            for mid in self.backend.model_ids:
+                self.ccs[key].add_model(self.backend[mid].copy(parent_inherits_results=True))
+
+        """
         # If only one CC exists, do nothing; otherwise, update assignments
         if len(self.ccs) == 1:
             key = list(self.ccs.keys())[0]
@@ -387,6 +394,7 @@ class Shadho(object):
                     else:
                         self.ccs[larger[i - 1]].add_model(
                             self.backend[smaller[j]])
+        """
 
     def success(self, tag, loss, results):
         """Handle successful task completion.
@@ -411,11 +419,11 @@ class Shadho(object):
         result_id, model_id, ccid = tag.split('.')
 
         # Update the DB with the result
-        self.backend.register_result(model_id, result_id, loss, results)
+        self.ccs[ccid].register_result(model_id, result_id, loss, results)
 
         # Reassign models to CCs at some frequency
-        if self.backend.result_count % 10 == 0:
-            self.assign_to_ccs()
+        # if self.backend.result_count % 10 == 0:
+        #     self.assign_to_ccs()
 
         # Update the number of enqueued items
         self.ccs[ccid].current_tasks -= 1
