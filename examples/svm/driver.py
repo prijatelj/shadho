@@ -43,7 +43,7 @@ if __name__ == '__main__':
 
     # Set up the SHADHO driver like usual
     opt = Shadho('bash svm_task.sh', space, timeout=3600)
-    opt.config.workqueue.name = 'jhibshma_12'
+    opt.config.workqueue.name = 'jhibshma_28'
     opt.config.workqueue.port = 0
 
     # Add the task files to the optimizer
@@ -60,6 +60,6 @@ if __name__ == '__main__':
     opt.add_compute_class('16-core', 'cores', 16, max_tasks=20)
     opt.add_compute_class('8-core', 'cores', 8, max_tasks=20)
     opt.add_compute_class('4-core', 'cores', 4, max_tasks=20)
-    opt.add_compute_class('2-core', 'cores', 4, max_tasks=20)
+    opt.add_compute_class('2-core', 'cores', 2, max_tasks=20)
 
     opt.run()
