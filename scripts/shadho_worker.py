@@ -19,6 +19,7 @@ try:
 except ImportError:
     import pickle
 import tarfile
+import psutil
 import resource
 
 DEFAULTS = {
@@ -109,10 +110,12 @@ def run(task, cfgpath='.shadhorc'):
         # Run the task and save the results in a format `shahdo` recognizes.
         result = task(spec)
         res=resource.getrusage(resource.RUSAGE_SELF)
+       # res = psutil.Process.cpu_times()
         lres=[]
         for r in res:
             lres.append(r)
-        dres=dict(enumerate(lres,100))
+        kres=['utime','stime','maxset','sharedmem','umem','ustack','pfault','pfaultIO','swapouts','iblock','oblock','msgsent','msgrcvd','signals','vcontext','ivcontext']
+        dres=dict(zip(kres,lres))
         result.update(dres)
         if isinstance(result, float):
             result = {cfg['global']['optimize']: result}
