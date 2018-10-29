@@ -494,8 +494,13 @@ class Shadho(object):
 
         for a_ccid in ccids:
             for a_mid in mids:
-                self.ccs[a_ccid].model_group.models[a_mid].jhibshma_rank =\
-                    self.sched_data[a_ccid][a_mid]['jhibshma_rank']
+                if self.sched_data[a_ccid][a_mid]['num_runs'] > 0:
+                    self.ccs[a_ccid].model_group.models[a_mid].jhibshma_rank =\
+                        self.sched_data[a_ccid][a_mid]['jhibshma_rank']
+                else:  # If it's never run, give it super high priority:
+                    self.ccs[a_ccid].model_group.models[a_mid].jhibshma_rank = 0.01
+
+        print('sched_data:')
         self.pp.pprint(self.sched_data)
 
     def success(self, tag, loss, results):
