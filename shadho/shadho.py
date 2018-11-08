@@ -83,7 +83,7 @@ class Shadho(object):
 
     """
 
-    def __init__(self, cmd, spec, files=None, use_complexity=True,
+    def __init__(self, cmd, spec, backend=None, files=None, use_complexity=True,
                  use_priority=True, timeout=600, max_tasks=100,
                  await_pending=False, max_resubmissions=0):
         self.config = ShadhoConfig()
@@ -116,6 +116,7 @@ class Shadho(object):
 
         self.config.save_config(self.__tmpdir)
         self.add_input_file(os.path.join(self.__tmpdir, '.shadhorc'))
+        self.backend = backend
 
     def __del__(self):
         if hasattr(self, '__tmpdir') and self.__tmpdir is not None:
@@ -208,6 +209,7 @@ class Shadho(object):
         # Set up the backend hyperparameter generation and database
         if not hasattr(self, 'backend'):
             self.backend = pyrameter.build(self.spec,
+                                           db=self.backend,
                                            complexity_sort=self.use_complexity,
                                            priority_sort=self.use_priority)
 
@@ -272,31 +274,31 @@ class Shadho(object):
         Hyperparameter values are generated from the search space specification
         supplied at instantiation using the requested generation method (i.e.,
         random search, TPE, Gaussian process Bayesian optimization, etc.).
-    
+
         Returns
         -------
         stop : bool
             If True, no values were generated and the search should stop. This
             facilitates grid-search-like behavior, for example stopping on
             completion of an exhaustive search.
-        
+
         Notes
         -----
         This method will automatically add a new task to the queue after
         generating hyperparameter values.
         """
         stop = True
-        
+
         # Generate hyperparameters for every compute class with space in queue
         for cc_id in self.ccs:
             cc = self.ccs[cc_id]
             n = cc.max_tasks - cc.current_tasks
-            
+
             # Generate enough hyperparameters to fill the queue
             for i in range(n):
                 # Get bookkeeping ids and hyperparameter values
                 model_id, result_id, param = cc.generate()
-                
+
                 # Create a new distributed task if values were generated
                 if param is not None:
                     # Encode info to map to db in the task tag
@@ -364,7 +366,7 @@ class Shadho(object):
             x = float(len(larger)) / float(len(smaller))
             y = x - 1  # Current step index (offset by 1 for 0-indexing)
             j = 0  # Current index of `smaller`
-            m = len(smaller) / 2
+            m = len(smaller) / 2  # Halfway point for second assignment
             n = len(larger) / 2  # Halfway point for second assignment
 
             for i in range(len(larger)):
@@ -419,6 +421,7 @@ class Shadho(object):
         result_id, model_id, ccid = tag.split('.')
 
         # Update the DB with the result
+        #self.backend.register_result(model_id, result_id, loss, results)
         self.ccs[ccid].register_result(model_id, result_id, loss, results)
 
         # Reassign models to CCs at some frequency
