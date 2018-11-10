@@ -85,12 +85,13 @@ class Shadho(object):
 
     def __init__(self, cmd, spec, backend=None, files=None, use_complexity=True,
                  use_priority=True, timeout=600, max_tasks=100,
-                 await_pending=False, max_resubmissions=0):
+                 await_pending=False, max_resubmissions=0, sort_method=None):
         self.config = ShadhoConfig()
         self.cmd = cmd
         self.spec = spec
         self.use_complexity = use_complexity
         self.use_priority = use_priority
+        self.sort_method = sort_method
         self.timeout = timeout if timeout is not None and timeout >= 0 \
                        else float('inf')
         self.max_tasks = 2 * max_tasks
@@ -211,7 +212,8 @@ class Shadho(object):
             self.backend = pyrameter.build(self.spec,
                                            db=self.backend,
                                            complexity_sort=self.use_complexity,
-                                           priority_sort=self.use_priority)
+                                           priority_sort=self.use_priority,
+                                           sort_method=self.sort_method)
 
         # If no ComputeClass was created, create a dummy class.
         if len(self.ccs) == 0:
