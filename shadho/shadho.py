@@ -19,6 +19,7 @@ import time
 import numpy as np
 import pyrameter
 import scipy.stats
+import pprint
 
 
 def shadho():
@@ -98,6 +99,8 @@ class Shadho(object):
         self.await_pending = await_pending
 
         self.ccs = OrderedDict()
+        self.sched_data = {}
+        self.pp = pprint.PrettyPrinter(indent=2)
 
         self.files = []
         if files is not None:
@@ -217,6 +220,16 @@ class Shadho(object):
         if len(self.ccs) == 0:
             cc = ComputeClass('all', None, None, self.max_tasks)
             self.ccs[cc.id] = cc
+
+        for ccid in list(self.ccs.keys()):
+            self.sched_data[ccid] = {}
+            for mid in self.backend.model_ids:
+                self.sched_data[ccid][mid] = {'avg_runtime': 0.125,
+                                              'tot_runtime': 0,
+                                              'num_runs': 0,
+                                              'speedup': 10000000000.0,
+                                              'per_compute_class_rank': 0,
+                                              'jhibshma_rank': 1}
 
         # Set up intial model/compute class assignments.
         self.assign_to_ccs()
@@ -344,6 +357,13 @@ class Shadho(object):
             key = list(self.ccs.keys())[0]
             self.ccs[key].model_group = self.backend
         else:
+            # NEWFANGLED WAY: ASSIGN ALL MODELS TO ALL COMPUTE CLASSES
+            for key in list(self.ccs.keys()):
+                self.ccs[key].clear()
+                for mid in self.backend.model_ids:
+                    self.ccs[key].add_model(self.backend[mid])
+            return
+
             # Sort models in the search by complexity, priority, or both and
             # get the updated order.
             self.backend.sort_models()
@@ -398,6 +418,93 @@ class Shadho(object):
                             self.backend[smaller[j]])
         """
 
+    def update_sched_data(self, ccid, mid, results):
+        """Update self.sched_data with a successful run's metrics.
+
+        This includes a full re-computation of all the sched_data.
+        """
+        self.sched_data[ccid][mid]['num_runs'] += 1.0
+        self.sched_data[ccid][mid]['tot_runtime'] += results['finish_time'] - results['start_time']
+        self.sched_data[ccid][mid]['avg_runtime'] = self.sched_data[ccid][mid]['tot_runtime'] /\
+                                                    float(self.sched_data[ccid][mid]['num_runs'])
+        #print('A grand experiment:')
+        #self.sched_data = {
+        #    'a': {1: {'speedup': 1.0}, 2: {'speedup': 1.0}, 3: {'speedup': 1.0}, 4: {'speedup': 1.0}},
+        #    'b': {1: {'speedup': 1.5}, 2: {'speedup': 1.4}, 3: {'speedup': 1.5}, 4: {'speedup': 1.3}},
+        #    'c': {1: {'speedup': 2.4}, 2: {'speedup': 2.3}, 3: {'speedup': 2.3}, 4: {'speedup': 2.8}},
+        #    'd': {1: {'speedup': 5.0}, 2: {'speedup': 5.1}, 3: {'speedup': 5.2}, 4: {'speedup': 4.9}}
+        #}
+        ccids = list(self.sched_data.keys())
+        mids = list(self.sched_data[ccids[0]].keys())
+
+        # First update speedup for mid
+        max_avg_runtime = 0
+        for a_ccid in ccids:
+            a = self.sched_data[a_ccid][mid]['avg_runtime']
+            if a > max_avg_runtime:
+                max_avg_runtime = a
+        for a_ccid in ccids:
+            self.sched_data[a_ccid][mid]['speedup'] = max_avg_runtime / self.sched_data[a_ccid][mid]['avg_runtime']
+
+        # Second, update all per compute class ranks:
+        #
+        # The following code is a bit confusing.
+        # Say we have speedups of [1.2, 2.1, 2.1, 1.7]
+        # Then the ranks of these speedups are said to be [4, 1.5, 1.5, 3]
+        # It is these ranks that the code calculates.
+        # Here a higher speedup leads to a "lower" rank value.
+        for a_ccid in ccids:
+            speedups = []
+            for a_mid in mids:
+                speedups.append(self.sched_data[a_ccid][a_mid]['speedup'])
+            speedups.sort(reverse=True)
+            per_compute_class_ranks = []
+            idx = 0
+            for i in range(0, len(speedups) + 1):
+                if i == len(speedups) or speedups[i] != speedups[idx]:
+                    num_tied = i - idx
+                    for j in range(idx, i):
+                        per_compute_class_ranks.append((num_tied + 1.0) / 2.0 + idx)
+                    idx = i
+            for a_mid in mids:
+                for i in range(0, len(speedups)):
+                    if self.sched_data[a_ccid][a_mid]['speedup'] == speedups[i]:
+                        self.sched_data[a_ccid][a_mid]['per_compute_class_rank'] = per_compute_class_ranks[i]
+                        break
+
+        # Third, update all jhibshma ranks:
+        # Same idea as above except the transpose of it.
+        # Here, "lower" per_compute_class_rank value corresponds to a lower jhibshma_rank value.
+        for a_mid in mids:
+            per_compute_class_ranks = []
+            for a_ccid in ccids:
+                per_compute_class_ranks.append(self.sched_data[a_ccid][a_mid]['per_compute_class_rank'])
+            per_compute_class_ranks.sort()
+            jhibshma_ranks = []
+            idx = 0
+            for i in range(0, len(per_compute_class_ranks) + 1):
+                if i == len(per_compute_class_ranks) or per_compute_class_ranks[i] != per_compute_class_ranks[idx]:
+                    num_tied = i - idx
+                    for j in range(idx, i):
+                        jhibshma_ranks.append((num_tied + 1.0) / 2.0 + idx)
+                    idx = i
+            for a_ccid in ccids:
+                for i in range(0, len(per_compute_class_ranks)):
+                    if self.sched_data[a_ccid][a_mid]['per_compute_class_rank'] == per_compute_class_ranks[i]:
+                        self.sched_data[a_ccid][a_mid]['jhibshma_rank'] = jhibshma_ranks[i]
+                        break
+
+        for a_ccid in ccids:
+            for a_mid in mids:
+                if self.sched_data[a_ccid][a_mid]['num_runs'] > 0:
+                    self.ccs[a_ccid].model_group.models[a_mid].jhibshma_rank =\
+                        self.sched_data[a_ccid][a_mid]['jhibshma_rank']
+                else:  # If it's never run, give it super high priority:
+                    self.ccs[a_ccid].model_group.models[a_mid].jhibshma_rank = 0.01
+
+        print('sched_data:')
+        self.pp.pprint(self.sched_data)
+
     def success(self, tag, loss, results):
         """Handle successful task completion.
 
@@ -419,6 +526,10 @@ class Shadho(object):
         """
         # Get bookkeeping information from the task tag
         result_id, model_id, ccid = tag.split('.')
+        # print('############## Success! ##############')
+        # print(json.dumps(results, indent=2, sort_keys=True))
+
+        self.update_sched_data(ccid, model_id, results)
 
         # Update the DB with the result
         #self.backend.register_result(model_id, result_id, loss, results)
