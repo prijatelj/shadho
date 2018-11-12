@@ -19,6 +19,7 @@ import time
 import numpy as np
 import pyrameter
 import scipy.stats
+from scipy.optimize import linprog
 import pprint
 
 
@@ -231,7 +232,8 @@ class Shadho(object):
                                               'num_runs': 0,
                                               'speedup': 10000000000.0,
                                               'per_compute_class_rank': 0,
-                                              'jhibshma_rank': 1}
+                                              'jhibshma_rank': 1,
+                                              'result_prob': 0.25}
 
         # Set up intial model/compute class assignments.
         self.assign_to_ccs()
@@ -436,8 +438,8 @@ class Shadho(object):
         #    'c': {1: {'speedup': 2.4}, 2: {'speedup': 2.3}, 3: {'speedup': 2.3}, 4: {'speedup': 2.8}},
         #    'd': {1: {'speedup': 5.0}, 2: {'speedup': 5.1}, 3: {'speedup': 5.2}, 4: {'speedup': 4.9}}
         #}
-        ccids = list(self.sched_data.keys())
-        mids = list(self.sched_data[ccids[0]].keys())
+        ccids = list(self.sched_data.keys()).sort()
+        mids = list(self.sched_data[ccids[0]].keys()).sort()
 
         # First update speedup for mid
         max_avg_runtime = 0
@@ -496,16 +498,16 @@ class Shadho(object):
                         self.sched_data[a_ccid][a_mid]['jhibshma_rank'] = jhibshma_ranks[i]
                         break
 
-        for a_ccid in ccids:
-            for a_mid in mids:
-                if self.sched_data[a_ccid][a_mid]['num_runs'] > 0:
-                    self.ccs[a_ccid].model_group.models[a_mid].jhibshma_rank =\
-                        self.sched_data[a_ccid][a_mid]['jhibshma_rank']
-                else:  # If it's never run, give it super high priority:
-                    self.ccs[a_ccid].model_group.models[a_mid].jhibshma_rank = 0.01
-
-        print('sched_data:')
-        self.pp.pprint(self.sched_data)
+        #for a_ccid in ccids:
+        #    for a_mid in mids:
+        #        if self.sched_data[a_ccid][a_mid]['num_runs'] > 0:
+        #            self.ccs[a_ccid].model_group.models[a_mid].jhibshma_rank =\
+        #                self.sched_data[a_ccid][a_mid]['jhibshma_rank']
+        #        else:  # If it's never run, give it super high priority:
+        #            self.ccs[a_ccid].model_group.models[a_mid].jhibshma_rank = 0.01
+        
+        # Update schedule probs to match target probs.
+        global_model_probabilities = self.backend.get_probabilties()
 
     def success(self, tag, loss, results):
         """Handle successful task completion.
