@@ -216,8 +216,8 @@ class Shadho(object):
             self.backend = pyrameter.build(self.spec,
                                            db=self.backend,
                                            complexity_sort=self.use_complexity,
-                                           priority_sort=self.use_priority,
-                                           sort_method=self.sort_method)
+                                           priority_sort=self.use_priority)#,
+                                           #sort_method=self.sort_method)
 
         # If no ComputeClass was created, create a dummy class.
         if len(self.ccs) == 0:
@@ -505,9 +505,38 @@ class Shadho(object):
         #                self.sched_data[a_ccid][a_mid]['jhibshma_rank']
         #        else:  # If it's never run, give it super high priority:
         #            self.ccs[a_ccid].model_group.models[a_mid].jhibshma_rank = 0.01
-        
+
         # Update schedule probs to match target probs.
-        global_model_probabilities = self.backend.get_probabilties()
+
+        # Step 1: Get info nicely into matrices (row = cc, col = model)
+        global_prob_matrix = []
+        global_avg_matrix = []
+        global_speedup_matrix = []
+        global_percent_running_matrix = []
+        for a_ccid in ccids:
+            compute_class_model_probabilities = self.ccs[a_ccid].get_probabilities(modified=False)
+            prob_row = []
+            avg_row = []
+            speedup_row = []
+            percent_running_row = []
+            prr_denom = 0
+            for a_mid in mids:
+                prob_row.append(compute_class_model_probabilities[a_mid])
+                avg_row.append(self.sched_data[a_ccid][a_mid]['average_runtime'])
+                speedup_row.append(self.sched_data[a_ccid][a_mid]['speedup'])
+                prr_denom += prob_row[-1] * avg_row[-1]
+            for i in range(len(mids)):
+                percent_running_row.append((prob_row[i] * avg_row[i]) / prr_denom
+            global_prob_matrix.append(prob_row)
+            global_avg_matrix.append(avg_row)
+            global_speedup_matrix.append(speedup_row)
+            global_percent_running_matrix.append(percent_running_row)
+        global_work_vector = []
+        for m_idx in range(len(mids)):
+            global_work_vector.append(0)
+            for cc_idx in range(len(ccids)):
+                global_work_vector[m_idx] += global_percent_running_matrix[cc_idx][m_idx] *\
+                                             global_speedup_matrix[cc_idx][m_idx]
 
     def success(self, tag, loss, results):
         """Handle successful task completion.

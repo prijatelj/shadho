@@ -90,8 +90,8 @@ class ComputeClass(object):
         """
         return self.model_group.generate(model_id)
 
-    def get_probabilities(self):
-        p = self.model_group.probabilities()
+    def get_probabilities(self, modified):
+        p = self.model_group.probabilities(modified)
         prob_map = {}
         for i in range(len(p[0])):
             prob_map[p[1][i]] = p[0][i]
