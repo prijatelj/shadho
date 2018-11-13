@@ -237,6 +237,7 @@ class Shadho(object):
 
         # Set up intial model/compute class assignments.
         self.assign_to_ccs()
+        self.modify_probabilities([0.25, 0.25, 0.25, 0.25])
 
         start = time.time()
         elapsed = 0
@@ -438,8 +439,10 @@ class Shadho(object):
         #    'c': {1: {'speedup': 2.4}, 2: {'speedup': 2.3}, 3: {'speedup': 2.3}, 4: {'speedup': 2.8}},
         #    'd': {1: {'speedup': 5.0}, 2: {'speedup': 5.1}, 3: {'speedup': 5.2}, 4: {'speedup': 4.9}}
         #}
-        ccids = list(self.sched_data.keys()).sort()
-        mids = list(self.sched_data[ccids[0]].keys()).sort()
+        ccids = list(self.ccs.keys())
+        ccids.sort()
+        mids = list(self.backend.model_ids)
+        mids.sort()
 
         # First update speedup for mid
         max_avg_runtime = 0
@@ -508,6 +511,15 @@ class Shadho(object):
 
         # Update schedule probs to match target probs.
 
+
+    def modify_probabilities(self, global_dist_target=None):
+        ccids = list(self.ccs.keys())
+        ccids.sort()
+        mids = list(self.backend.model_ids)
+        mids.sort()
+        num_ccs = len(ccids)
+        num_models = len(mids)
+
         # Step 1: Get info nicely into matrices (row = cc, col = model)
         global_prob_matrix = []
         global_avg_matrix = []
@@ -522,21 +534,143 @@ class Shadho(object):
             prr_denom = 0
             for a_mid in mids:
                 prob_row.append(compute_class_model_probabilities[a_mid])
-                avg_row.append(self.sched_data[a_ccid][a_mid]['average_runtime'])
+                avg_row.append(self.sched_data[a_ccid][a_mid]['avg_runtime'])
                 speedup_row.append(self.sched_data[a_ccid][a_mid]['speedup'])
                 prr_denom += prob_row[-1] * avg_row[-1]
-            for i in range(len(mids)):
-                percent_running_row.append((prob_row[i] * avg_row[i]) / prr_denom
+            for i in range(num_models):
+                percent_running_row.append((prob_row[i] * avg_row[i]) / prr_denom)
             global_prob_matrix.append(prob_row)
             global_avg_matrix.append(avg_row)
             global_speedup_matrix.append(speedup_row)
             global_percent_running_matrix.append(percent_running_row)
         global_work_vector = []
-        for m_idx in range(len(mids)):
+        for m_idx in range(num_models):
             global_work_vector.append(0)
-            for cc_idx in range(len(ccids)):
+            for cc_idx in range(num_ccs):
                 global_work_vector[m_idx] += global_percent_running_matrix[cc_idx][m_idx] *\
                                              global_speedup_matrix[cc_idx][m_idx]
+
+        if global_dist_target is not None:
+            global_work_vector = global_dist_target
+        # This commented out section was test code:
+        # ccids = list(self.ccs.keys())
+        # ccids.sort()
+        # mids = list(self.backend.model_ids)
+        # mids.sort()
+        # num_ccs = len(ccids)
+        # num_models = len(mids)
+        # global_work_vector = [1.5, 1.5, 1.5, 1.5]
+        # global_speedup_matrix = [[1, 1, 1, 3], [1, 1, 1, 3], [2, 1, 2, 1], [2, 1, 2, 1]]
+        # global_avg_matrix = [[10, 4, 10, 5], [10, 4, 10, 5], [5, 8, 5, 15], [5, 8, 5, 15]]
+
+        # Step 2: Now, set up the first LP to solve for what we want the running percents to be
+
+        # First LP: |Models|*|Compute Classes| + 1 (new values for percent running + optimized value C)
+        # Conceptual ordering is first by model and then by compute class:
+        #   e.g. (m1, cc1), (m1, cc2), ... (m2, cc1), ..., C
+
+        vector_size = num_models * num_ccs + 1
+
+        # All zeros except for the last entry
+        c = np.array([0 if i + 1 < vector_size else -1.0 for i in range(vector_size)])
+
+        # Make sure the sum = 1 for every set of probabilities/percents
+        # And make sure each probability/percent >= 0
+        percent_sum_rows = []
+        percent_sum_values = []
+        percent_geq_rows = []
+        percent_geq_values = []
+        for cc_idx in range(num_ccs):
+            sum_row = [0 for i in range(vector_size)]
+            for m_idx in range(num_models):
+                vector_idx = m_idx * num_ccs + cc_idx
+                sum_row[vector_idx] = 1.0
+                percent_geq_rows.append([-1.0 if i == vector_idx else 0 for i in range(vector_size)])
+                percent_geq_values.append(0.0)
+            percent_sum_rows.append(sum_row)
+            percent_sum_values.append(1.0)
+
+        # Make sure the result work vector is a scaling of the old work vector
+        # (Not sure whether or not to make this an == or a <= constraint.)
+        # (Written so that it can be treated as either.)
+        work_rows = []
+        work_values = []
+        for m_idx in range(num_models):
+            work_row = [0 for i in range(vector_size)]
+            for cc_idx in range(num_ccs):
+                vector_idx = m_idx * num_ccs + cc_idx
+                work_row[vector_idx] = -1.0 * global_speedup_matrix[cc_idx][m_idx]
+            work_row[-1] = global_work_vector[m_idx]
+            work_rows.append(work_row)
+            work_values.append(0.0)
+
+        equality_constraints = percent_sum_rows + work_rows
+        equality_values = percent_sum_values + work_values
+        leq_constraints = percent_geq_rows
+        leq_values = percent_geq_values
+
+        result = linprog(c, A_ub=leq_constraints, b_ub=leq_values, A_eq=equality_constraints, b_eq=equality_values)
+        # self.pp.pprint(result)
+
+        # Now that we know the target percent runtime values, we can compute the percent assignment values.
+        # No optimization of anything -- just a solution is desired.
+        # In this computation the elements are first ordered by compute class, then by model.
+        target_percent_runtime_values = result['x']
+
+        vector_size = num_ccs * num_models
+        c = [0.0 for i in range(vector_size)]
+        work_rows = []
+        work_values = []
+        for cc_idx in range(num_ccs):
+            for m_idx in range(num_models):
+                work_row = [0 for i in range(vector_size)]
+                vector_idx = cc_idx * num_models + m_idx
+                old_vector_idx = m_idx * num_ccs + cc_idx
+                for m_idx_prime in range(num_models):
+                    vector_idx_prime = cc_idx * num_models + m_idx_prime
+                    work_row[vector_idx_prime] += \
+                        target_percent_runtime_values[old_vector_idx] * global_avg_matrix[cc_idx][m_idx_prime]
+                work_row[vector_idx] += -1.0 * global_avg_matrix[cc_idx][m_idx]
+                work_rows.append(work_row)
+                work_values.append(0)
+
+        probability_sum_rows = []
+        probability_sum_values = []
+        probability_geq_rows = []
+        probability_geq_values = []
+        for cc_idx in range(num_ccs):
+            sum_row = [0 for i in range(vector_size)]
+            for m_idx in range(num_models):
+                vector_idx = cc_idx * num_models + m_idx
+                sum_row[vector_idx] = 1.0
+                probability_geq_rows.append([-1.0 if i == vector_idx else 0 for i in range(vector_size)])
+                probability_geq_values.append(0.0)
+            probability_sum_rows.append(sum_row)
+            probability_sum_values.append(1.0)
+
+        equality_constraints = probability_sum_rows + work_rows
+        equality_values = probability_sum_values + work_values
+        leq_constraints = probability_geq_rows
+        leq_values = probability_geq_values
+        result = linprog(c, A_ub=leq_constraints, b_ub=leq_values, A_eq=equality_constraints, b_eq=equality_values)
+        # self.pp.pprint(result)
+
+        # Send the modified probabilities to the models
+        for cc_idx in range(num_ccs):
+            num_missing = 0.0
+            for a_mid in mids:
+                if self.sched_data[ccids[cc_idx]][a_mid]['num_runs'] == 0:
+                    num_missing += 1.0
+            for m_idx in range(num_models):
+                vector_idx = cc_idx * num_models + m_idx
+                if self.sched_data[ccids[cc_idx]][mids[m_idx]]['num_runs'] > 0 and num_missing == 0:
+                    self.ccs[ccids[cc_idx]].model_group.models[mids[m_idx]].modified_prob = \
+                        result['x'][vector_idx]
+                elif self.sched_data[ccids[cc_idx]][mids[m_idx]]['num_runs'] > 0:
+                    self.ccs[ccids[cc_idx]].model_group.models[mids[m_idx]].modified_prob = 0
+                else:
+                    self.ccs[ccids[cc_idx]].model_group.models[mids[m_idx]].modified_prob = 1.0 / num_missing
+                    
 
     def success(self, tag, loss, results):
         """Handle successful task completion.
@@ -563,6 +697,7 @@ class Shadho(object):
         # print(json.dumps(results, indent=2, sort_keys=True))
 
         self.update_sched_data(ccid, model_id, results)
+        self.modify_probabilities([0.25, 0.25, 0.25, 0.25])
 
         # Update the DB with the result
         #self.backend.register_result(model_id, result_id, loss, results)
