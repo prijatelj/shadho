@@ -227,17 +227,16 @@ class Shadho(object):
         for ccid in list(self.ccs.keys()):
             self.sched_data[ccid] = {}
             for mid in self.backend.model_ids:
-                self.sched_data[ccid][mid] = {'avg_runtime': 0.125,
+                self.sched_data[ccid][mid] = {'avg_runtime': 100000000,
                                               'tot_runtime': 0,
                                               'num_runs': 0,
-                                              'speedup': 10000000000.0,
+                                              'speedup': 1.0,
                                               'per_compute_class_rank': 0,
-                                              'jhibshma_rank': 1,
-                                              'result_prob': 0.25}
+                                              'jhibshma_rank': 1}
 
         # Set up intial model/compute class assignments.
         self.assign_to_ccs()
-        self.modify_probabilities([0.25, 0.25, 0.25, 0.25])
+        self.modify_probabilities([0.3, 0.3, 0.15, 0.25])
 
         start = time.time()
         elapsed = 0
@@ -615,6 +614,7 @@ class Shadho(object):
         # Now that we know the target percent runtime values, we can compute the percent assignment values.
         # No optimization of anything -- just a solution is desired.
         # In this computation the elements are first ordered by compute class, then by model.
+
         target_percent_runtime_values = result['x']
 
         vector_size = num_ccs * num_models
@@ -628,6 +628,9 @@ class Shadho(object):
                 old_vector_idx = m_idx * num_ccs + cc_idx
                 for m_idx_prime in range(num_models):
                     vector_idx_prime = cc_idx * num_models + m_idx_prime
+                    self.pp.pprint(work_row)
+                    self.pp.pprint(target_percent_runtime_values)
+                    self.pp.pprint(global_avg_matrix[cc_idx])
                     work_row[vector_idx_prime] += \
                         target_percent_runtime_values[old_vector_idx] * global_avg_matrix[cc_idx][m_idx_prime]
                 work_row[vector_idx] += -1.0 * global_avg_matrix[cc_idx][m_idx]
@@ -697,7 +700,7 @@ class Shadho(object):
         # print(json.dumps(results, indent=2, sort_keys=True))
 
         self.update_sched_data(ccid, model_id, results)
-        self.modify_probabilities([0.25, 0.25, 0.25, 0.25])
+        self.modify_probabilities([0.3, 0.3, 0.15, 0.25])
 
         # Update the DB with the result
         #self.backend.register_result(model_id, result_id, loss, results)
