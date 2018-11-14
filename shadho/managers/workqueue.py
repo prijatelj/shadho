@@ -218,8 +218,19 @@ class WQManager(work_queue.WorkQueue):
         result['submit_time'] = task.submit_time
         result['start_time'] = task.execute_cmd_start
         result['finish_time'] = task.finish_time
-        result['resources_measured'] = {}
-        result['resources_measured']['memory']=task.resources_measured.memory
+        t=task.resources_measured #pulling resources from the monitor
+        result['resources_measured'] = {} # json append needs to be on by one, t isn't json serializable
+        result['resources_measured']['memory']=t.memory
+        result['resources_measured']['cores']=t.cores
+        result['resources_measured']['peak_cores']=t.peak_cores
+        result['resources_measured']['max_concurrent']=t.max_concurrent_processes
+        result['resources_measured']['vmemory']=t.virtual_memory
+        result['resources_measured']['smemory']=t.swap_memory
+        result['resources_measured']['readbytes']=t.bytes_read
+        result['resources_measured']['writebytes']=t.bytes_written
+        result['resources_measured']['inputbytes']=t.bytes_received
+        result['resources_measured']['outputbytes']=t.bytes_send
+        result['resources_measured']['disk']=t.disk
         return (task.tag, loss, result)
 
     def failure(self, task):
