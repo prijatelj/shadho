@@ -64,7 +64,7 @@ class WQManager(work_queue.WorkQueue):
                                         catalog=False)
 
         self.specify_log(logfile)
-
+        self.enable_monitoring(watchdog = False)
         self.param_file = param_file
         self.out_file = out_file
         self.results_file = results_file
@@ -218,6 +218,8 @@ class WQManager(work_queue.WorkQueue):
         result['submit_time'] = task.submit_time
         result['start_time'] = task.execute_cmd_start
         result['finish_time'] = task.finish_time
+        result['resources_measured'] = {}
+        result['resources_measured']['memory']=task.resources_measured.memory
         return (task.tag, loss, result)
 
     def failure(self, task):
