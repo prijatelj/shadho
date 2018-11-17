@@ -123,6 +123,8 @@ class Shadho(object):
         self.add_input_file(os.path.join(self.__tmpdir, '.shadhorc'))
         self.backend = backend
 
+        self.global_work_percent_targets = None
+
     def __del__(self):
         if hasattr(self, '__tmpdir') and self.__tmpdir is not None:
             os.rmdir(self.__tmpdir)
@@ -236,7 +238,12 @@ class Shadho(object):
 
         # Set up intial model/compute class assignments.
         self.assign_to_ccs()
-        self.modify_probabilities([0.3, 0.3, 0.15, 0.25])
+        mids = list(self.backend.model_ids)
+        target_probs = [0.40, 0.18, 0.20, 0.22]
+        self.global_work_percent_targets = {}
+        for mid_idx in range(len(mids)):
+            self.global_work_percent_targets[mids[mid_idx]] = target_probs[mid_idx]
+        self.modify_probabilities()  #self.global_work_percent_targets)
 
         start = time.time()
         elapsed = 0
@@ -323,7 +330,7 @@ class Shadho(object):
                     self.manager.add_task(
                         self.cmd,
                         tag,
-                        param,
+                        param_copy,
                         files=self.files,
                         resource=cc.resource,
                         value=cc.value)
@@ -519,48 +526,82 @@ class Shadho(object):
         num_ccs = len(ccids)
         num_models = len(mids)
 
+        # Before even starting, check that a job has finished on each compute class.
+        # If not, do no updates.
+        have_not_run = 0
+        max_avg_runtime = None
+        min_avg_runtime = None
+        for a_ccid in ccids:
+            for a_mid in mids:
+                if self.sched_data[a_ccid][a_mid]['num_runs'] == 0:
+                    have_not_run += 1
+                    print('Missing Model ' + a_mid + ' on cc ' + a_ccid)
+                else:
+                    if max_avg_runtime is None or max_avg_runtime < self.sched_data[a_ccid][a_mid]['avg_runtime']:
+                        max_avg_runtime = self.sched_data[a_ccid][a_mid]['avg_runtime']
+                    if min_avg_runtime is None or min_avg_runtime > self.sched_data[a_ccid][a_mid]['avg_runtime']:
+                        min_avg_runtime = self.sched_data[a_ccid][a_mid]['avg_runtime']
+        if have_not_run > 0:
+            # Used to have code which tells all things which _have_ run not to.
+            print('')
+            # return
+
         # Step 1: Get info nicely into matrices (row = cc, col = model)
         global_prob_matrix = []
         global_avg_matrix = []
-        global_speedup_matrix = []
+        global_job_per_time_matrix = []
         global_percent_running_matrix = []
+
         for a_ccid in ccids:
             compute_class_model_probabilities = self.ccs[a_ccid].get_probabilities(modified=False)
+            # The following modification IS NOT ACTUALLY CORRECT. NOR IS IT DOING ANYTHING.
+            # Rather, it exists to give an estimate of the speedup we'll get.
+            if global_dist_target is not None:
+                compute_class_model_probabilities = global_dist_target
             prob_row = []
             avg_row = []
-            speedup_row = []
+            job_per_time_row = []
             percent_running_row = []
             prr_denom = 0
             for a_mid in mids:
                 prob_row.append(compute_class_model_probabilities[a_mid])
-                avg_row.append(self.sched_data[a_ccid][a_mid]['avg_runtime'])
-                speedup_row.append(self.sched_data[a_ccid][a_mid]['speedup'])
+                if self.sched_data[a_ccid][a_mid]['num_runs'] > 0:
+                    # Max_avg_runtime is simply used to make the values less extreme.
+                    avg_row.append(self.sched_data[a_ccid][a_mid]['avg_runtime'] / float(max_avg_runtime))
+                else:
+                    # If we have no data on it, treat it as if it is fast so we prioritize scheduling it
+                    if min_avg_runtime is None:
+                        avg_row.append(1.0)
+                    else:
+                        avg_row.append(min_avg_runtime / (max_avg_runtime * 2.0))
+                job_per_time_row.append(1.0 / avg_row[-1])
                 prr_denom += prob_row[-1] * avg_row[-1]
             for i in range(num_models):
                 percent_running_row.append((prob_row[i] * avg_row[i]) / prr_denom)
             global_prob_matrix.append(prob_row)
             global_avg_matrix.append(avg_row)
-            global_speedup_matrix.append(speedup_row)
+            global_job_per_time_matrix.append(job_per_time_row)
             global_percent_running_matrix.append(percent_running_row)
+        # print('global_avg_matrix:')
+        # self.pp.pprint(global_avg_matrix)
+
         global_work_vector = []
         for m_idx in range(num_models):
             global_work_vector.append(0)
             for cc_idx in range(num_ccs):
                 global_work_vector[m_idx] += global_percent_running_matrix[cc_idx][m_idx] *\
-                                             global_speedup_matrix[cc_idx][m_idx]
+                                             global_job_per_time_matrix[cc_idx][m_idx]
 
         if global_dist_target is not None:
-            global_work_vector = global_dist_target
-        # This commented out section was test code:
-        # ccids = list(self.ccs.keys())
-        # ccids.sort()
-        # mids = list(self.backend.model_ids)
-        # mids.sort()
-        # num_ccs = len(ccids)
-        # num_models = len(mids)
-        # global_work_vector = [1.5, 1.5, 1.5, 1.5]
-        # global_speedup_matrix = [[1, 1, 1, 3], [1, 1, 1, 3], [2, 1, 2, 1], [2, 1, 2, 1]]
-        # global_avg_matrix = [[10, 4, 10, 5], [10, 4, 10, 5], [5, 8, 5, 15], [5, 8, 5, 15]]
+            print('Old global work vector:')
+            self.pp.pprint(global_work_vector)
+            tot = 0.0
+            for i in range(len(global_work_vector)):
+                tot += global_work_vector[i]
+            print('New global work vector:')
+            for m_idx in range(num_models):
+                global_work_vector[m_idx] = global_dist_target[mids[m_idx]] * tot
+            self.pp.pprint(global_work_vector)
 
         # Step 2: Now, set up the first LP to solve for what we want the running percents to be
 
@@ -598,7 +639,7 @@ class Shadho(object):
             work_row = [0 for i in range(vector_size)]
             for cc_idx in range(num_ccs):
                 vector_idx = m_idx * num_ccs + cc_idx
-                work_row[vector_idx] = -1.0 * global_speedup_matrix[cc_idx][m_idx]
+                work_row[vector_idx] = -1.0 * global_job_per_time_matrix[cc_idx][m_idx]
             work_row[-1] = global_work_vector[m_idx]
             work_rows.append(work_row)
             work_values.append(0.0)
@@ -609,7 +650,10 @@ class Shadho(object):
         leq_values = percent_geq_values
 
         result = linprog(c, A_ub=leq_constraints, b_ub=leq_values, A_eq=equality_constraints, b_eq=equality_values)
-        # self.pp.pprint(result)
+        if not result['success']:
+            print('Failed to solve linear program 1!')
+            return
+        print('Expected speedup of ' + str(result['x'][-1]))
 
         # Now that we know the target percent runtime values, we can compute the percent assignment values.
         # No optimization of anything -- just a solution is desired.
@@ -619,6 +663,7 @@ class Shadho(object):
 
         vector_size = num_ccs * num_models
         c = [0.0 for i in range(vector_size)]
+
         work_rows = []
         work_values = []
         for cc_idx in range(num_ccs):
@@ -626,13 +671,12 @@ class Shadho(object):
                 work_row = [0 for i in range(vector_size)]
                 vector_idx = cc_idx * num_models + m_idx
                 old_vector_idx = m_idx * num_ccs + cc_idx
+                target_value = 0
+                if target_percent_runtime_values[old_vector_idx] >= 0.01:  # Throw away miniscule targets
+                    target_value = target_percent_runtime_values[old_vector_idx]
                 for m_idx_prime in range(num_models):
                     vector_idx_prime = cc_idx * num_models + m_idx_prime
-                    self.pp.pprint(work_row)
-                    self.pp.pprint(target_percent_runtime_values)
-                    self.pp.pprint(global_avg_matrix[cc_idx])
-                    work_row[vector_idx_prime] += \
-                        target_percent_runtime_values[old_vector_idx] * global_avg_matrix[cc_idx][m_idx_prime]
+                    work_row[vector_idx_prime] += target_value * global_avg_matrix[cc_idx][m_idx_prime]
                 work_row[vector_idx] += -1.0 * global_avg_matrix[cc_idx][m_idx]
                 work_rows.append(work_row)
                 work_values.append(0)
@@ -651,29 +695,28 @@ class Shadho(object):
             probability_sum_rows.append(sum_row)
             probability_sum_values.append(1.0)
 
-        equality_constraints = probability_sum_rows + work_rows
-        equality_values = probability_sum_values + work_values
-        leq_constraints = probability_geq_rows
-        leq_values = probability_geq_values
+        equality_constraints = probability_sum_rows
+        equality_values = probability_sum_values
+        leq_constraints = probability_geq_rows + work_rows
+        leq_values = probability_geq_values + work_values
         result = linprog(c, A_ub=leq_constraints, b_ub=leq_values, A_eq=equality_constraints, b_eq=equality_values)
+        if not result['success']:
+            print('Failed to solve linear program 2! Status: ' + str(result['status']))
+            return
         # self.pp.pprint(result)
 
         # Send the modified probabilities to the models
         for cc_idx in range(num_ccs):
-            num_missing = 0.0
-            for a_mid in mids:
-                if self.sched_data[ccids[cc_idx]][a_mid]['num_runs'] == 0:
-                    num_missing += 1.0
             for m_idx in range(num_models):
                 vector_idx = cc_idx * num_models + m_idx
-                if self.sched_data[ccids[cc_idx]][mids[m_idx]]['num_runs'] > 0 and num_missing == 0:
-                    self.ccs[ccids[cc_idx]].model_group.models[mids[m_idx]].modified_prob = \
-                        result['x'][vector_idx]
-                elif self.sched_data[ccids[cc_idx]][mids[m_idx]]['num_runs'] > 0:
-                    self.ccs[ccids[cc_idx]].model_group.models[mids[m_idx]].modified_prob = 0
-                else:
-                    self.ccs[ccids[cc_idx]].model_group.models[mids[m_idx]].modified_prob = 1.0 / num_missing
-                    
+                prob = result['x'][vector_idx]
+                if prob < -0.01:
+                    print('Serious error! Negative Probability! ' + str(prob))
+                    prob = 0.0
+                elif prob < 0.0:
+                    print('Minor error. Negative Residue. ' + str(prob))
+                    prob = 0.0
+                self.ccs[ccids[cc_idx]].model_group.models[mids[m_idx]].modified_prob = prob
 
     def success(self, tag, loss, results):
         """Handle successful task completion.
@@ -700,7 +743,7 @@ class Shadho(object):
         # print(json.dumps(results, indent=2, sort_keys=True))
 
         self.update_sched_data(ccid, model_id, results)
-        self.modify_probabilities([0.3, 0.3, 0.15, 0.25])
+        self.modify_probabilities()  #self.global_work_percent_targets)
 
         # Update the DB with the result
         #self.backend.register_result(model_id, result_id, loss, results)
