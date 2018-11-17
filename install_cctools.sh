@@ -12,8 +12,9 @@ user=""
 
 # Get the CCTools source
 cd $base
-git clone -b hyperopt_worker https://github.com/nkremerh/cctools
 
+#git clone https://github.com/cooperative-computing-lab/cctools
+git clone -b mon_no_kill https://github.com/btovar/cctools
 # Get paths
 perlpath="$base/perl"  # "$(head -1 ${base}/paths.txt | tail -1)"
 #py2path="$(head -2 ${base}/paths.txt | tail -1)"
@@ -38,7 +39,6 @@ done
 
 # Configure, make, and install
 cd cctools
-
 prefix="$HOME/.shadho"
 
 export LD_LIBRARY_PATH="${base}/pcre/lib:$LD_LIBRARY_PATH"
@@ -54,7 +54,6 @@ if [ ! -z "$py3path" ]; then
         --with-python3-path=$py3path \
         --with-perl-path=$perlpath \
         --with-swig-path=$swigpath \
-        --without-system-resource_monitor \
         --without-system-umbrella \
         --without-system-weaver
 

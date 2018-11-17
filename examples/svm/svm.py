@@ -84,7 +84,7 @@ def main(params):
             svc,
             n_estimators=10,
             max_samples=0.1,
-            n_jobs=-1))
+            n_jobs=kernel_params['cores']))
 
     # Train and compute the training time.
     start = time.time()

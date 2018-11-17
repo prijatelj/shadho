@@ -11,6 +11,7 @@ WQBuffer
 import json
 import os
 import tarfile
+import pprint
 
 import work_queue
 
@@ -64,7 +65,7 @@ class WQManager(work_queue.WorkQueue):
                                         catalog=False)
 
         self.specify_log(logfile)
-
+        # self.enable_monitoring(watchdog = False)
         self.param_file = param_file
         self.out_file = out_file
         self.results_file = results_file
@@ -218,6 +219,20 @@ class WQManager(work_queue.WorkQueue):
         result['submit_time'] = task.submit_time
         result['start_time'] = task.execute_cmd_start
         result['finish_time'] = task.finish_time
+        t=task.resources_measured #pulling resources from the monitor
+        # pprint.pprint(t)
+        result['resources_measured'] = {} # json append needs to be on by one, t isn't json serializable
+        result['resources_measured']['memory']=t.memory
+        result['resources_measured']['cores']=t.cores
+        result['resources_measured']['avgcores']=t.cores_avg
+        result['resources_measured']['max_concurrent']=t.max_concurrent_processes
+        result['resources_measured']['vmemory']=t.virtual_memory
+        result['resources_measured']['smemory']=t.swap_memory
+        result['resources_measured']['readbytes']=t.bytes_read
+        result['resources_measured']['writebytes']=t.bytes_written
+        result['resources_measured']['inputbytes']=t.bytes_received
+        #result['resources_measured']['outputbytes']=t.bytes_send
+        result['resources_measured']['disk']=t.disk
         return (task.tag, loss, result)
 
     def failure(self, task):
