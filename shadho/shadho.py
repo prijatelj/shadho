@@ -102,6 +102,9 @@ class Shadho(object):
         self.await_pending = await_pending
 
         self.ccs = OrderedDict()
+
+        self.fake_ccs = OrderedDict()
+        self.first_assignment = True
         self.sched_data = {}
         self.pp = pprint.PrettyPrinter(indent=2)
 
@@ -124,7 +127,7 @@ class Shadho(object):
         self.add_input_file(os.path.join(self.__tmpdir, '.shadhorc'))
         self.backend = backend
 
-        self.global_work_percent_targets = None
+        # self.global_work_percent_targets = None
 
     def __del__(self):
         if hasattr(self, '__tmpdir') and self.__tmpdir is not None:
@@ -192,6 +195,7 @@ class Shadho(object):
         """
         cc = ComputeClass(name, resource, value, 2 * max_tasks)
         self.ccs[cc.id] = cc
+        self.fake_ccs[cc.id] = cc
 
     def run(self):
         """Search hyperparameter values on remote workers.
@@ -226,6 +230,7 @@ class Shadho(object):
         if len(self.ccs) == 0:
             cc = ComputeClass('all', None, None, self.max_tasks)
             self.ccs[cc.id] = cc
+            self.fake_ccs[cc.id] = cc
 
         for ccid in list(self.ccs.keys()):
             self.sched_data[ccid] = {}
@@ -240,11 +245,11 @@ class Shadho(object):
         # Set up intial model/compute class assignments.
         self.assign_to_ccs()
         mids = list(self.backend.model_ids)
-        target_probs = [0.40, 0.18, 0.20, 0.22]
-        self.global_work_percent_targets = {}
-        for mid_idx in range(len(mids)):
-            self.global_work_percent_targets[mids[mid_idx]] = target_probs[mid_idx]
-        self.modify_probabilities()  #self.global_work_percent_targets)
+        # target_probs = [0.40, 0.18, 0.20, 0.22]
+        # self.global_work_percent_targets = {}
+        # for mid_idx in range(len(mids)):
+        #     self.global_work_percent_targets[mids[mid_idx]] = target_probs[mid_idx]
+        self.modify_probabilities(fake_cc_use='Modify')
 
         start = time.time()
         elapsed = 0
@@ -330,7 +335,8 @@ class Shadho(object):
                     tag = '.'.join([result_id, model_id, cc_id])
                     param_copy = copy.deepcopy(param)
                     for kernel in param_copy:
-                        param_copy[kernel]['cores'] = cc.value
+                        # Don't forget the - 1
+                        param_copy[kernel]['cores'] = cc.value - 1
                     self.manager.add_task(
                         self.cmd,
                         tag,
@@ -361,22 +367,24 @@ class Shadho(object):
         `pyrameter.ModelGroup`
         """
         # NEWFANGLED WAY: assign COPIES of ALL models to ALL compute classes
-        for key in list(self.ccs.keys()):
-            self.ccs[key].clear()
-            for mid in self.backend.model_ids:
-                self.ccs[key].add_model(self.backend[mid].copy(parent_inherits_results=True))
-
-        """
-        # If only one CC exists, do nothing; otherwise, update assignments
-        if len(self.ccs) == 1:
-            key = list(self.ccs.keys())[0]
-            self.ccs[key].model_group = self.backend
-        else:
-            # NEWFANGLED WAY: ASSIGN ALL MODELS TO ALL COMPUTE CLASSES
+        if self.first_assignment:
+            self.first_assignment = False
             for key in list(self.ccs.keys()):
                 self.ccs[key].clear()
                 for mid in self.backend.model_ids:
-                    self.ccs[key].add_model(self.backend[mid])
+                    self.ccs[key].add_model(self.backend[mid].copy(parent_inherits_results=True))
+
+        # OLD WAY: only do this with the fake_ccs for prob calculations.
+        # If only one CC exists, do nothing; otherwise, update assignments
+        if len(self.fake_ccs) == 1:
+            key = list(self.fake_ccs.keys())[0]
+            self.fake_ccs[key].model_group = self.backend
+        else:
+            # NEWFANGLED WAY: ASSIGN ALL MODELS TO ALL COMPUTE CLASSES
+            for key in list(self.fake_ccs.keys()):
+                self.fake_ccs[key].clear()
+                for mid in self.backend.model_ids:
+                    self.fake_ccs[key].add_model(self.backend[mid])
             return
 
             # Sort models in the search by complexity, priority, or both and
@@ -385,12 +393,12 @@ class Shadho(object):
             model_ids = [mid for mid in self.backend.model_ids]
 
             # Clear the current assignments
-            for key in list(self.ccs.keys()):
-                self.ccs[key].clear()
+            for key in list(self.fake_ccs.keys()):
+                self.fake_ccs[key].clear()
 
             # Determine if the number of compute classes or the number of
             # model ids is larger
-            ccids = list(self.ccs.keys())
+            ccids = list(self.fake_ccs.keys())
             larger = model_ids if len(model_ids) >= len(ccids) else ccids
             smaller = ccids if larger == model_ids else model_ids
 
@@ -415,23 +423,22 @@ class Shadho(object):
                 #     add model to cc at cc_idx + 1.
                 # Else:
                 #     add model to cc at cc_idx - 1
-                if smaller[j] in self.ccs:
-                    self.ccs[smaller[j]].add_model(self.backend[larger[i]])
+                if smaller[j] in self.fake_ccs:
+                    self.fake_ccs[smaller[j]].add_model(self.backend[larger[i]])
                     if j < m:
-                        self.ccs[smaller[j + 1]].add_model(
+                        self.fake_ccs[smaller[j + 1]].add_model(
                             self.backend[larger[i]])
                     else:
-                        self.ccs[smaller[j - 1]].add_model(
+                        self.fake_ccs[smaller[j - 1]].add_model(
                             self.backend[larger[i]])
                 else:
-                    self.ccs[larger[i]].add_model(self.backend[smaller[j]])
+                    self.fake_ccs[larger[i]].add_model(self.backend[smaller[j]])
                     if i < n:
-                        self.ccs[larger[i + 1]].add_model(
+                        self.fake_ccs[larger[i + 1]].add_model(
                             self.backend[smaller[j]])
                     else:
-                        self.ccs[larger[i - 1]].add_model(
+                        self.fake_ccs[larger[i - 1]].add_model(
                             self.backend[smaller[j]])
-        """
 
     def update_sched_data(self, ccid, mid, results):
         """Update self.sched_data with a successful run's metrics.
@@ -521,8 +528,21 @@ class Shadho(object):
 
         # Update schedule probs to match target probs.
 
-
-    def modify_probabilities(self, global_dist_target=None):
+    # global_dist_target: An array of percentages in order of sorted mid
+    #   specifies what percent of completed jobs should be of the corresponding model
+    # fake_cc_use:
+    #   'None' --> Ignore fake ccs entirely
+    #   'Copy' --> Act as if we're using the fake ccs
+    #   'Modify' --> Get probabilities from fake ccs and then
+    def modify_probabilities(self, global_dist_target=None, fake_cc_use='None'):
+        if global_dist_target is not None:
+            if fake_cc_use != 'None':
+                print('Conflicting arguments passed: global_dist_target is not None and fake_cc_use is also not \'None\'.')
+                print('Setting fake_cc_use to \'None\'')
+            fake_cc_use = 'None'
+        if fake_cc_use != 'None' and fake_cc_use != 'Copy' and fake_cc_use != 'Modify':
+            print('Error: fake_cc_use has invalid value of \'' + fake_cc_use + '\'. Setting to \'None\'.')
+            fake_cc_use = 'None'
         ccids = list(self.ccs.keys())
         ccids.sort()
         mids = list(self.backend.model_ids)
@@ -535,10 +555,12 @@ class Shadho(object):
         have_not_run = 0
         max_avg_runtime = None
         min_avg_runtime = None
+        have_not_run_on_all_ccs = {}
         for a_ccid in ccids:
             for a_mid in mids:
                 if self.sched_data[a_ccid][a_mid]['num_runs'] == 0:
                     have_not_run += 1
+                    have_not_run_on_all_ccs[a_mid] = 1
                     print('Missing Model ' + a_mid + ' on cc ' + a_ccid)
                 else:
                     if max_avg_runtime is None or max_avg_runtime < self.sched_data[a_ccid][a_mid]['avg_runtime']:
@@ -550,6 +572,18 @@ class Shadho(object):
             print('')
             # return
 
+        # If not everything has run yet and we're not just copying fake_ccs:
+        if fake_cc_use == 'None' or fake_cc_use == 'Modify':
+            if have_not_run > 0:
+                for a_ccid in ccids:
+                    for a_mid in mids:
+                        if self.sched_data[a_ccid][a_mid]['num_runs'] == 0:
+                            self.ccs[a_ccid].model_group.models[a_mid].modified_prob = 1
+                        else:
+                            self.ccs[a_ccid].model_group.models[a_mid].modified_prob = 0.001
+                print('\"Manually\" setting probabilities until all have run.')
+                return
+
         # Step 1: Get info nicely into matrices (row = cc, col = model)
         global_prob_matrix = []
         global_avg_matrix = []
@@ -557,7 +591,14 @@ class Shadho(object):
         global_percent_running_matrix = []
 
         for a_ccid in ccids:
-            compute_class_model_probabilities = self.ccs[a_ccid].get_probabilities(modified=False)
+            if fake_cc_use != 'None':
+                compute_class_model_probabilities = self.fake_ccs[a_ccid].get_probabilities(modified=False)
+                for a_mid in mids:
+                    if a_mid not in compute_class_model_probabilities:
+                        compute_class_model_probabilities[a_mid] = 0
+            else:
+                compute_class_model_probabilities = self.ccs[a_ccid].get_probabilities(modified=False)
+
             # The following modification IS NOT ACTUALLY CORRECT. NOR IS IT DOING ANYTHING.
             # Rather, it exists to give an estimate of the speedup we'll get.
             if global_dist_target is not None:
@@ -570,14 +611,19 @@ class Shadho(object):
             for a_mid in mids:
                 prob_row.append(compute_class_model_probabilities[a_mid])
                 if self.sched_data[a_ccid][a_mid]['num_runs'] > 0:
-                    # Max_avg_runtime is simply used to make the values less extreme.
-                    avg_row.append(self.sched_data[a_ccid][a_mid]['avg_runtime'] / float(max_avg_runtime))
+                    # If it has been run here but not on other ccs, say this one is slow to motivate
+                    # putting it elsewhere.
+                    if a_mid in have_not_run_on_all_ccs:
+                        avg_row.append(2.0)
+                    else:
+                        # Max_avg_runtime is simply used to make the values less extreme.
+                        avg_row.append(self.sched_data[a_ccid][a_mid]['avg_runtime'] / float(max_avg_runtime))
                 else:
-                    # If we have no data on it, treat it as if it is fast so we prioritize scheduling it
                     if min_avg_runtime is None:
                         avg_row.append(1.0)
                     else:
-                        avg_row.append(min_avg_runtime / (max_avg_runtime * 2.0))
+                        # Make it believe it's slow so it gets more time to meet demands.
+                        avg_row.append(1.0)
                 job_per_time_row.append(1.0 / avg_row[-1])
                 prr_denom += prob_row[-1] * avg_row[-1]
             for i in range(num_models):
@@ -586,9 +632,16 @@ class Shadho(object):
             global_avg_matrix.append(avg_row)
             global_job_per_time_matrix.append(job_per_time_row)
             global_percent_running_matrix.append(percent_running_row)
-        # print('global_avg_matrix:')
-        # self.pp.pprint(global_avg_matrix)
-
+        
+        # If we're just doing an exact copy of fake ccs, don't need to do any optimization.
+        # Just make the modified probs the same as if we were using fake ccs.
+        if fake_cc_use == 'Copy':
+            for cc_idx in range(num_ccs):
+                for m_idx in range(num_models):
+                    prob = global_prob_matrix[cc_idx][m_idx]
+                    self.ccs[ccids[cc_idx]].model_group.models[mids[m_idx]].modified_prob = prob
+            return
+            
         global_work_vector = []
         for m_idx in range(num_models):
             global_work_vector.append(0)
@@ -596,13 +649,14 @@ class Shadho(object):
                 global_work_vector[m_idx] += global_percent_running_matrix[cc_idx][m_idx] *\
                                              global_job_per_time_matrix[cc_idx][m_idx]
 
+        print('Global work vector:')
+        self.pp.pprint(global_work_vector)
+
         if global_dist_target is not None:
-            print('Old global work vector:')
-            self.pp.pprint(global_work_vector)
             tot = 0.0
             for i in range(len(global_work_vector)):
                 tot += global_work_vector[i]
-            print('New global work vector:')
+            print('Modified global work vector:')
             for m_idx in range(num_models):
                 global_work_vector[m_idx] = global_dist_target[mids[m_idx]] * tot
             self.pp.pprint(global_work_vector)
@@ -720,6 +774,7 @@ class Shadho(object):
                 elif prob < 0.0:
                     print('Minor error. Negative Residue. ' + str(prob))
                     prob = 0.0
+                print('Assigning prob of ' + str(prob) + ' to model ' + mids[m_idx] + ' on ' + ccids[cc_idx])
                 self.ccs[ccids[cc_idx]].model_group.models[mids[m_idx]].modified_prob = prob
 
     def success(self, tag, loss, results):
@@ -746,16 +801,15 @@ class Shadho(object):
         # print('############## Success! ##############')
         # print(json.dumps(results, indent=2, sort_keys=True))
 
-        self.update_sched_data(ccid, model_id, results)
-        self.modify_probabilities()  #self.global_work_percent_targets)
-
         # Update the DB with the result
-        #self.backend.register_result(model_id, result_id, loss, results)
         self.ccs[ccid].register_result(model_id, result_id, loss, results)
 
+        self.update_sched_data(ccid, model_id, results)
+        self.modify_probabilities(fake_cc_use='Modify')
+
         # Reassign models to CCs at some frequency
-        # if self.backend.result_count % 10 == 0:
-        #     self.assign_to_ccs()
+        if self.backend.result_count % 10 == 0:
+            self.assign_to_ccs()
 
         # Update the number of enqueued items
         self.ccs[ccid].current_tasks -= 1
