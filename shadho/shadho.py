@@ -107,6 +107,7 @@ class Shadho(object):
         self.first_assignment = True
         self.sched_data = {}
         self.pp = pprint.PrettyPrinter(indent=2)
+        self.first_modify = True
 
         self.files = []
         if files is not None:
@@ -573,15 +574,16 @@ class Shadho(object):
             # return
 
         # If not everything has run yet and we're not just copying fake_ccs:
-        if fake_cc_use == 'None' or fake_cc_use == 'Modify':
-            if have_not_run > 0:
+        if (fake_cc_use == 'None' or fake_cc_use == 'Modify') and self.first_modify:
+            self.first_modify = False
+            if have_not_run > 0:  # This check is redundant if using first_modify.
                 for a_ccid in ccids:
                     for a_mid in mids:
                         if self.sched_data[a_ccid][a_mid]['num_runs'] == 0:
                             self.ccs[a_ccid].model_group.models[a_mid].modified_prob = 1
                         else:
                             self.ccs[a_ccid].model_group.models[a_mid].modified_prob = 0.001
-                print('\"Manually\" setting probabilities until all have run.')
+                print('\"Manually\" setting probabilities.')
                 return
 
         # Step 1: Get info nicely into matrices (row = cc, col = model)
