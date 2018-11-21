@@ -8,6 +8,7 @@ Shadho
 from .config import ShadhoConfig
 from .hardware import ComputeClass
 from .managers import create_manager
+import model_sorts
 
 import copy
 from collections import OrderedDict
@@ -20,7 +21,6 @@ import time
 import numpy as np
 import pyrameter
 import scipy.stats
-
 
 def shadho():
     pass
@@ -51,6 +51,25 @@ class Shadho(object):
     max_resubmissions: int, optional
         Maximum number of times to resubmit a particular parameterization for
         processing if task failure occurs. Default is not to resubmit.
+    update_frequency: float, optional
+        Amount of results obtained before updating the assignment of models to
+        compute classes assignment. Default is update every 10 results.
+    checkpoint_frequency: float, optional
+        Amount of results obtained before saving the backend. Default is update
+        every 50 results.
+    model_sort: str, optional
+        The sort method to be used for assigning models to compute classes and
+        possibly defining the models priority in exploring. Default is None, and
+        uses default SHADHO assignment method.
+    init_model_sort: str, optional
+        The sort method to be used for the initial assignment of models to
+        compute classes. The same as model_sort and meant for use only when the
+        initialization method is different than model_sort. Default value (None)
+        results in using the same model_sort for initialization.
+    pyrameter_model_sort: str, optional
+        The local sorting of the models within pyrameter (specifically each
+        model group). Default is None, and uses SHADHO/pyrameter's default
+        sorting method.
 
     Attributes
     ----------
@@ -86,7 +105,10 @@ class Shadho(object):
 
     def __init__(self, cmd, spec, backend=None, files=None, use_complexity=True,
                  use_priority=True, timeout=600, max_tasks=100,
-                 await_pending=False, max_resubmissions=0):
+                 await_pending=False, max_resubmissions=0,
+                 update_frequency=10, checkpoint_frequency=50,
+                 model_sort=None, init_model_sort=None,
+                 pyrameter_model_sort=None):
         self.config = ShadhoConfig()
         self.cmd = cmd
         self.spec = spec
@@ -97,6 +119,11 @@ class Shadho(object):
         self.max_tasks = 2 * max_tasks
         self.max_resubmissions = max_resubmissions
         self.await_pending = await_pending
+        self.update_frequency = update_frequency
+        self.checkpoint_frequency = checkpoint_frequency
+        self.model_sort = model_sort
+        self.init_model_sort = init_model_sort
+        self.pyrameter_model_sort = pyrameter_model_sort
 
         self.ccs = OrderedDict()
 
@@ -220,7 +247,7 @@ class Shadho(object):
             self.ccs[cc.id] = cc
 
         # Set up intial model/compute class assignments.
-        self.assign_to_ccs()
+        self.assign_to_ccs(self.init_model_sort)
 
         start = time.time()
         elapsed = 0
@@ -239,7 +266,7 @@ class Shadho(object):
                         else:
                             self.failure(*result)  # Resubmit if asked
                     # Checkpoint the results to file or DB at some frequency
-                    if self.backend.result_count % 50 == 0:
+                    if self.backend.result_count % self.checkpoint_frequency == 0:
                         self.backend.save()
                     # Update the time for timeout check
                     elapsed = time.time() - start
@@ -317,13 +344,21 @@ class Shadho(object):
                     stop = False  # Ensure that the search continues
             cc.current_tasks = cc.max_tasks  # Update to show full queue
 
-    def assign_to_ccs(self):
+    def assign_to_ccs(self, override_model_sort=None):
         """Assign trees to compute classes.
 
         Each independent model in the search (model being one of a disjoint set
         of search domains) is assigned to at least two compute classes based on
         its rank relative to other models. In this way, only a subset of models
         are evaluated on each set of hardware.
+
+        Parameters
+        ----------
+        override_model_sort : str, optional
+            If this specific and single call to assign_to_ccs is to use a
+            different sort method for assigning models to ccs than the class'
+            assigned method. This is typically not used, except possibly for
+            initial assignments.
 
         Notes
         -----
@@ -336,18 +371,57 @@ class Shadho(object):
         `shadho.ComputeClass`
         `pyrameter.ModelGroup`
         """
-        # NEWFANGLED WAY: assign COPIES of ALL models to ALL compute classes
-        for key in list(self.ccs.keys()):
-            self.ccs[key].clear()
-            for mid in self.backend.model_ids:
-                self.ccs[key].add_model(self.backend[mid].copy(parent_inherits_results=True))
+        # set the model_sort for this assignment
+        model_sort = self.model_sort if override_model_sort is None else override_model_sort
 
-        """
+        # NOTE Ideal for testing is use SHADHO args to easily switch scheduler
         # If only one CC exists, do nothing; otherwise, update assignments
         if len(self.ccs) == 1:
             key = list(self.ccs.keys())[0]
             self.ccs[key].model_group = self.backend
-        else:
+        elif model_sort == 'online_reinforcement_svm':
+            # TODO create new assignment
+            # when initialized randomize which model gets assigned to what 2 ccs
+            # when updating, pass or somehow give the desired mapping,
+            # preferably ensure that the model groups know what they need to
+            # know about each model (ie. uncertainty).
+
+            # For universal/global ranking of models use self.backend, which
+            # will have the rank of all moedls.
+            # Can extract the priority (uncertainty) from backend for finer
+            # grained control of the ranking/ordering in pyrameter.
+            # To extract priority ranking of models only: if want w/o complexity
+            #if self.sort_complexity: # resort using priority (uncertainty) only
+            #    self.modelgroup.complexity_sort = False
+            #    self.modelgroup.sort()
+            #for mid in modelgroup.model_ids:
+            #    model = modelgroup.models[mid]
+            #        priority = model.priority
+            #if self.sort_complexity: # resort with complexity
+            #    self.modelgroup.complexity_sort = True
+            #    self.modelgroup.sort() # may be excessive, did not confirm
+
+            # either send entire SHADHO object, or only models + sample data
+
+            ccs_to_model_id = model_sorts.online_reinforcement_svm(self)
+            # Reassign the models in each ccs based on sort method
+            # either return a dict of model_id to list(ccs), or do it w/in func
+            for ccs_key, model_ids in self.ccs.items():
+                self.ccs[ccs_key].clear()
+                # TODO learn how to pass desired ranking/priority of models to pyrameter!
+                for model_id in model_ids:
+                    self.ccs[ccs_key].add_model(self.backend[model_id].copy())
+                # NOTE This does not rely on pyrameter handling local scheduling or history! More like the default version.
+
+        elif model_sort=='assign_all':
+            # NOTE this is an expensive operation when repetively called & doing
+            # the same thing everytime with no change.
+            # NEWFANGLED WAY: assign COPIES of ALL models to ALL compute classes
+            for key in list(self.ccs.keys()):
+                self.ccs[key].clear()
+                for mid in self.backend.model_ids:
+                    self.ccs[key].add_model(self.backend[mid].copy(parent_inherits_results=True))
+        else: # self.model_sort is None or self.model_sort == 'default':
             # Sort models in the search by complexity, priority, or both and
             # get the updated order.
             self.backend.sort_models()
@@ -400,7 +474,6 @@ class Shadho(object):
                     else:
                         self.ccs[larger[i - 1]].add_model(
                             self.backend[smaller[j]])
-        """
 
     def success(self, tag, loss, results):
         """Handle successful task completion.
@@ -429,8 +502,8 @@ class Shadho(object):
         self.ccs[ccid].register_result(model_id, result_id, loss, results)
 
         # Reassign models to CCs at some frequency
-        # if self.backend.result_count % 10 == 0:
-        #     self.assign_to_ccs()
+        if self.backend.result_count % self.update_frequency == 0:
+             self.assign_to_ccs()
 
         # Update the number of enqueued items
         self.ccs[ccid].current_tasks -= 1
