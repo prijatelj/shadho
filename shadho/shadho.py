@@ -8,7 +8,7 @@ Shadho
 from .config import ShadhoConfig
 from .hardware import ComputeClass
 from .managers import create_manager
-import model_sorts
+from shadho import model_sorts
 
 import copy
 from collections import OrderedDict
