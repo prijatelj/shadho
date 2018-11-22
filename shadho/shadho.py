@@ -331,13 +331,14 @@ class Shadho(object):
                 if param is not None:
                     # Encode info to map to db in the task tag
                     tag = '.'.join([result_id, model_id, cc_id])
-                    param_copy = copy.deepcopy(param)
-                    for kernel in param_copy:
-                        param_copy[kernel]['cores'] = cc.value
+                    #param_copy = copy.deepcopy(param)
+                    #for kernel in param_copy:
+                    #    param_copy[kernel]['cores'] = cc.value
                     self.manager.add_task(
                         self.cmd,
                         tag,
-                        param_copy,
+                        param,
+                        #param_copy,
                         files=self.files,
                         resource=cc.resource,
                         value=cc.value)
@@ -498,8 +499,8 @@ class Shadho(object):
         result_id, model_id, ccid = tag.split('.')
 
         # Update the DB with the result
-        #self.backend.register_result(model_id, result_id, loss, results)
-        self.ccs[ccid].register_result(model_id, result_id, loss, results)
+        self.backend.register_result(model_id, result_id, loss, results)
+        #self.ccs[ccid].register_result(model_id, result_id, loss, results)
 
         # Reassign models to CCs at some frequency
         if self.backend.result_count % self.update_frequency == 0:

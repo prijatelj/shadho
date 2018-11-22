@@ -11,7 +11,6 @@ WQBuffer
 import json
 import os
 import tarfile
-import pprint
 
 import work_queue
 
@@ -220,7 +219,6 @@ class WQManager(work_queue.WorkQueue):
         result['start_time'] = task.execute_cmd_start
         result['finish_time'] = task.finish_time
         t=task.resources_measured #pulling resources from the monitor
-        # pprint.pprint(t)
         result['resources_measured'] = {} # json append needs to be on by one, t isn't json serializable
         result['resources_measured']['memory']=t.memory
         result['resources_measured']['cores']=t.cores

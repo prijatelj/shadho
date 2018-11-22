@@ -84,7 +84,7 @@ def main(params):
             svc,
             n_estimators=10,
             max_samples=0.1,
-            n_jobs=kernel_params['cores']))
+            n_jobs=kernel_params['cores']))# TODO use kernel_params cores to limit cores used by SHADHO workers?
 
     # Train and compute the training time.
     start = time.time()
