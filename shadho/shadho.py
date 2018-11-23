@@ -104,6 +104,8 @@ class Shadho(object):
         self.ccs = OrderedDict()
 
         self.fake_ccs = OrderedDict()
+        self.fake_to_real_ccids = {}
+        self.real_to_fake_ccids = {}
         self.first_assignment = True
         self.sched_data = {}
         self.pp = pprint.PrettyPrinter(indent=2)
@@ -195,8 +197,11 @@ class Shadho(object):
             default 100.
         """
         cc = ComputeClass(name, resource, value, 2 * max_tasks)
+        cc2 = ComputeClass(name, resource, value, 2 * max_tasks)
         self.ccs[cc.id] = cc
-        self.fake_ccs[cc.id] = cc
+        self.fake_ccs[cc2.id] = cc2
+        self.fake_to_real_ccids[cc2.id] = cc.id
+        self.real_to_fake_ccids[cc.id] = cc2.id
 
     def run(self):
         """Search hyperparameter values on remote workers.
@@ -250,7 +255,7 @@ class Shadho(object):
         # self.global_work_percent_targets = {}
         # for mid_idx in range(len(mids)):
         #     self.global_work_percent_targets[mids[mid_idx]] = target_probs[mid_idx]
-        self.modify_probabilities(fake_cc_use='Modify')
+        self.modify_probabilities(fake_cc_use='Copy')
 
         start = time.time()
         elapsed = 0
@@ -381,13 +386,6 @@ class Shadho(object):
             key = list(self.fake_ccs.keys())[0]
             self.fake_ccs[key].model_group = self.backend
         else:
-            # NEWFANGLED WAY: ASSIGN ALL MODELS TO ALL COMPUTE CLASSES
-            for key in list(self.fake_ccs.keys()):
-                self.fake_ccs[key].clear()
-                for mid in self.backend.model_ids:
-                    self.fake_ccs[key].add_model(self.backend[mid])
-            return
-
             # Sort models in the search by complexity, priority, or both and
             # get the updated order.
             self.backend.sort_models()
@@ -594,7 +592,7 @@ class Shadho(object):
 
         for a_ccid in ccids:
             if fake_cc_use != 'None':
-                compute_class_model_probabilities = self.fake_ccs[a_ccid].get_probabilities(modified=False)
+                compute_class_model_probabilities = self.fake_ccs[self.real_to_fake_ccids[a_ccid]].get_probabilities(modified=False)
                 for a_mid in mids:
                     if a_mid not in compute_class_model_probabilities:
                         compute_class_model_probabilities[a_mid] = 0
@@ -651,8 +649,8 @@ class Shadho(object):
                 global_work_vector[m_idx] += global_percent_running_matrix[cc_idx][m_idx] *\
                                              global_job_per_time_matrix[cc_idx][m_idx]
 
-        print('Global work vector:')
-        self.pp.pprint(global_work_vector)
+        # print('Global work vector:')
+        # self.pp.pprint(global_work_vector)
 
         if global_dist_target is not None:
             tot = 0.0
@@ -807,7 +805,7 @@ class Shadho(object):
         self.ccs[ccid].register_result(model_id, result_id, loss, results)
 
         self.update_sched_data(ccid, model_id, results)
-        self.modify_probabilities(fake_cc_use='Modify')
+        self.modify_probabilities(fake_cc_use='Copy')
 
         # Reassign models to CCs at some frequency
         if self.backend.result_count % 10 == 0:
