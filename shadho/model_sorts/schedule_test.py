@@ -1,4 +1,4 @@
-
+from perceptron import Perceptron
 
 if __name__ == '__main__':
     # 4 different compute classes (a,b,c,d)
@@ -35,6 +35,8 @@ if __name__ == '__main__':
 
     # ascending order of classes have worse performance with more models.
     #len(a) * 1
-    len(b_assigned_models) * 2
-    len(c_assigned_models) * 3
-    len(d_assigned_models) * 4
+    #len(b_assigned_models) * 2
+    #len(c_assigned_models) * 3
+    #len(d_assigned_models) * 4
+
+    perceptron = Perceptron(1, 4)

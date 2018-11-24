@@ -12,12 +12,12 @@ def handle_shadho_sample(shadho):
     # expected output: 1d array of probs for each compute class
     # then deterministic decision making process, ie. assign to top 2.
 
-class perceptron(object):
+class Perceptron(object):
     """
     Online reinforcement learning perceptron for mapping models to compute
     classes
     """
-    def __init__(self, input_length, compute_class_ids):
+    def __init__(self, input_length, compute_class_ids, *args, *kwargs):
         self.compute_class_ids = np.array(compute_class_ids)
 
         self.network_input, self.softmax_linear = inference(input_length)
@@ -77,7 +77,15 @@ class perceptron(object):
         # The total loss is defined as the reinforcement loss plus all of the weight decay terms (L2 loss).
         return tf.add_n(tf.get_collection('losses'), name='total_loss'), reinforcement_penalties
 
-    def train(total_loss, global_step, initial_learning_rate, num_epochs_per_decay, learning_rate_decy_factor, moving_average_decay):
+    def train(total_loss, global_step, initial_learning_rate=0.1, num_epochs_per_decay=100, learning_rate_decay_factor=0.9, moving_average_decay=0.99):
+        """
+        :param initial_learning_rate: Learning rate of perceptron
+        :param num_epochs_per_decay: number of epochs to pass before decaying
+            learning rate
+        :param learning_rate_decay_factor: How much the learning rate is
+            preserved. Exponent in the exponential decay.
+        :param moving_average_decay: *fudge factor to jump directly to minimum
+        """
 
         # Decay the learning rate exponentially based on the number of steps.
         lr = tf.train.exponential_decay(initial_learning_rate, global_step, num_epochs_per_decay, learning_rate_decay_factor, staircase=True)
