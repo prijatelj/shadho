@@ -5,6 +5,7 @@ low-end Tensorflow API to have finer-grained control over the math.
 :author: Derek S. Prijatelj
 """
 
+
 def online_reinforcement_svm(shadho):
     #TODO extact the sample data, their loss params (runtime or throughput), labels = compute classes each model assigned to in order of model_id. Assumes model_id static throughout SHADHO run.
 

@@ -125,6 +125,12 @@ class Shadho(object):
         self.init_model_sort = init_model_sort
         self.pyrameter_model_sort = pyrameter_model_sort
 
+        # Store all memory necessary for sorting models dynamically.
+        #if model_sort == 'dynamic_perceptron':
+        #    self.model_sort_memory = init_dynamic_perceptron()
+        #else:
+        #    self.model_sort_memory = None
+
         self.ccs = OrderedDict()
 
         self.files = []
@@ -331,14 +337,14 @@ class Shadho(object):
                 if param is not None:
                     # Encode info to map to db in the task tag
                     tag = '.'.join([result_id, model_id, cc_id])
-                    #param_copy = copy.deepcopy(param)
-                    #for kernel in param_copy:
-                    #    param_copy[kernel]['cores'] = cc.value
+                    param_copy = copy.deepcopy(param)
+                    for kernel in param_copy:
+                        param_copy[kernel]['cores'] = cc.value
                     self.manager.add_task(
                         self.cmd,
                         tag,
-                        param,
-                        #param_copy,
+                        #param,
+                        param_copy,
                         files=self.files,
                         resource=cc.resource,
                         value=cc.value)
@@ -403,7 +409,7 @@ class Shadho(object):
             #    self.modelgroup.sort() # may be excessive, did not confirm
 
             # either send entire SHADHO object, or only models + sample data
-
+            # TODO in progress at the moment and will require memory!
             ccs_to_model_id = model_sorts.online_reinforcement_svm(self)
             # Reassign the models in each ccs based on sort method
             # either return a dict of model_id to list(ccs), or do it w/in func
