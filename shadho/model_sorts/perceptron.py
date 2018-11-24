@@ -1,23 +1,16 @@
 """
 Online reinforcement learning perceptron using mini-batching
 """
+import numpy as np
 import tensorflow as tf
-
-def handle_shadho_sample(shadho):
-    # TODO get single sample from shadho and get a the full minibatch
-    # then incremental train and predict
-    # mini batch so feed fwd with update_freq samples, then update & predict
-
-    # sample = model_id, [1-hot vector size compute classes], cores, avg_cores, memory, virtual_memory, swap_memory, bytes_recieved, bytes_sent
-    # expected output: 1d array of probs for each compute class
-    # then deterministic decision making process, ie. assign to top 2.
 
 class Perceptron(object):
     """
     Online reinforcement learning perceptron for mapping models to compute
     classes
     """
-    def __init__(self, input_length, compute_class_ids, *args, *kwargs):
+    def __init__(self, input_length, model_ids, compute_class_ids, *args, **kwargs):
+        self.model_ids = np.array(model_ids)
         self.compute_class_ids = np.array(compute_class_ids)
 
         self.network_input, self.softmax_linear = inference(input_length)
@@ -27,6 +20,18 @@ class Perceptron(object):
 
         self.sess = tf.Session()
         self.sess.run(init_op)
+
+    def model_id_to_onehot(self, model_id):
+        return (self.model_ids == model_id).astype(int)
+
+    def compute_class_to_onehot(self, compute_class):
+        return (self.compute_class_ids == compute_class).astype(int)
+
+    def handle_input(raw_input_vectors):
+        input_vectors = []
+        for i in raw_input_vector:
+            input_vectors.append(np.array(model_id_to_onehot(i[0]) + compute_class_to_onehot(i[1]) + i[2:], dtype=float))
+        return input_vectors
 
     def inference(self, input_length):
         """
@@ -38,18 +43,17 @@ class Perceptron(object):
 
         with tf.variable_scope('hidden1') as scope:
             weights = tf.get_variable('hidden1_weights',shape=[input_length, 10], initializer=tf.truncated_normal_initializer(stddev=0.04))
-            weight_decay = tf.multiply(tf.nn.l2_loss(weights), 0.004, name='weight_loss'))
+            weight_decay = tf.multiply(tf.nn.l2_loss(weights), 0.004, name='weight_loss')
             tf.add_to_collection('losses', weight_decay)
             biases = tf.get_variable('hidden1_biases', shape=[10],initializer=tf.constant_initializer(0.1))
             hidden1 = tf.nn.relu(tf.matmul(network_input, weights) + biases, name=scope.name)
 
         with tf.variable_scope('hidden2') as scope:
             weights = tf.get_variable('hidden2_weights',shape=[10,10], initializer=tf.truncated_normal_initializer(stddev=0.04))
-            weight_decay = tf.multiply(tf.nn.l2_loss(weights), 0.004, name='weight_loss'))
+            weight_decay = tf.multiply(tf.nn.l2_loss(weights), 0.004, name='weight_loss')
             tf.add_to_collection('losses', weight_decay)
             biases = tf.get_variable('hidden2_biases', shape=[10],initializer=tf.constant_initializer(0.1))
             hidden2 = tf.nn.relu(tf.matmul(hidden1, weights) + biases, name=scope.name)
-
 
         with tf.variable_scope('softmax_linear') as scope:
             weights = tf.get_variable('softmax_weights',shape=[10, flags.OUTPUT_LEVELS], initializer=tf.truncated_normal_initializer(stddev=1.0))
@@ -113,23 +117,25 @@ class Perceptron(object):
             OR average for all where vector is same length but all the same
             # do greedy first, so first one.
         """
-        for output_vector in shadho_output:
+        input_vectors = handle_input(input_vectors)
+        for output_vector, input_vector in zip(input_vectors, shadho_output):
             # optional: transform the shadho_output in some way
             #output_vector = self.transform_shadho_output(output_vector, . . . )
             self.sess.run(self.train_op, feed_dict={self.reinforcement_penalty_handle: output_vector, self.input_handle: input_vector})
 
     def predict(self, input_vectors):
+        input_vectors = handle_input(input_vectors)
         logit_list = []
         for input_vector in input_vectors:
             logit_list.append(self.sess.run(logits, feed_dict = {self.input_handle : input_vector}))
         # outputs log probabilities, convert to non-log probabilities
-        logit_list = [logits.apply(lambda x: np.e ** x / np.sum(np.e**x)), axis=1) for logits in logit_list]
+        logit_list = [logits.apply(lambda x: np.e ** x / np.sum(np.e**x), axis=1) for logits in logit_list]
         return logit_list,  self.generate_schedule(input_vectors, logit_list)
 
-    def generate_schedule(self, logit_list)
+    def generate_schedule(self, input_vectors, logit_list):
         # TODO deterministic decision
         # top 2 models per ccs
-        return {input_vectors[i][0]:comput_class_idx[np.argsort(l)[-2:]] for i, l  in enumerate(logit_list)}
+        return {np.where(input_vectors[i][0:len(self.model_ids)])[0][0]:comput_class_idx[np.argsort(l)[-2:]] for i, l  in enumerate(logit_list)}
 
     def close():
         self.sess.close()

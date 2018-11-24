@@ -1,3 +1,5 @@
+import numpy as np
+
 from perceptron import Perceptron
 
 if __name__ == '__main__':
@@ -39,4 +41,17 @@ if __name__ == '__main__':
     #len(c_assigned_models) * 3
     #len(d_assigned_models) * 4
 
-    perceptron = Perceptron(1, 4)
+    models = ['w', 'x', 'y', 'z']
+    perceptron = Perceptron(8, models, list(runtime_map.keys()))
+
+    samples = []
+    runtimes = []
+    for i in range(100):
+        model_id = np.random.choice(model_ids)
+        cc_id = np.random.choice(list(runtime_map.keys()))
+        rand = np.random.uniform(size=3)
+        samples.append([model_id, cc_id, rand[0], rand[1], rand[2]])
+        runtimes.append(runtime_map[cc_id][model_id])
+
+    perceptron.update(samples, runtimes)
+    perceptron.predict(samples)
