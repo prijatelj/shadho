@@ -13,8 +13,8 @@ user=""
 # Get the CCTools source
 cd $base
 
-#git clone https://github.com/cooperative-computing-lab/cctools
-git clone -b mon_no_kill https://github.com/btovar/cctools
+git clone https://github.com/cooperative-computing-lab/cctools
+
 # Get paths
 perlpath="$base/perl"  # "$(head -1 ${base}/paths.txt | tail -1)"
 #py2path="$(head -2 ${base}/paths.txt | tail -1)"

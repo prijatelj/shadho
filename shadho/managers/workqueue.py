@@ -218,19 +218,25 @@ class WQManager(work_queue.WorkQueue):
         result['submit_time'] = task.submit_time
         result['start_time'] = task.execute_cmd_start
         result['finish_time'] = task.finish_time
+
         t=task.resources_measured #pulling resources from the monitor
         result['resources_measured'] = {} # json append needs to be on by one, t isn't json serializable
-        result['resources_measured']['memory']=t.memory
+        # CPU and processes
         result['resources_measured']['cores']=t.cores
-        result['resources_measured']['avgcores']=t.cores_avg
-        result['resources_measured']['max_concurrent']=t.max_concurrent_processes
-        result['resources_measured']['vmemory']=t.virtual_memory
-        result['resources_measured']['smemory']=t.swap_memory
-        result['resources_measured']['readbytes']=t.bytes_read
-        result['resources_measured']['writebytes']=t.bytes_written
-        result['resources_measured']['inputbytes']=t.bytes_received
-        #result['resources_measured']['outputbytes']=t.bytes_send
+        result['resources_measured']['cores_avg']=t.cores_avg
+        result['resources_measured']['max_concurrent_processes']=t.max_concurrent_processes
+        # Memory
+        result['resources_measured']['memory']=t.memory
+        result['resources_measured']['virtual_memory']=t.virtual_memory
+        result['resources_measured']['swap_memory']=t.swap_memory
         result['resources_measured']['disk']=t.disk
+        # Local I/O
+        result['resources_measured']['bytes_read']=t.bytes_read
+        result['resources_measured']['bytes_written']=t.bytes_written
+        # Network I/O
+        result['resources_measured']['bytes_received']=t.bytes_received
+        result['resources_measured']['bytes_sent']=t.bytes_sent
+
         return (task.tag, loss, result)
 
     def failure(self, task):
