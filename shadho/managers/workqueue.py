@@ -64,7 +64,7 @@ class WQManager(work_queue.WorkQueue):
                                         catalog=False)
 
         self.specify_log(logfile)
-        # self.enable_monitoring(watchdog = False)
+        self.enable_monitoring(watchdog = False)
         self.param_file = param_file
         self.out_file = out_file
         self.results_file = results_file
