@@ -30,10 +30,15 @@ class Perceptron(object):
         return (self.compute_class_ids == compute_class).astype(int)
 
     def handle_input(self, raw_input_vectors):
+        """Handles multiple raw input vectors."""
         input_vectors = []
         for i in raw_input_vectors:
             input_vectors.append(np.append(np.append(self.model_id_to_onehot(i[0]), self.compute_class_to_onehot(i[1])),  i[2:]).reshape([1, -1]))
         return input_vectors
+
+    def handle_output(self, raw_output):
+        """Handles single raw_output value."""
+        return np.asarray(raw_output, dtype=float).reshape([1,1])
 
     def inference(self, input_length, target_levels, output_levels=None):
         """
@@ -78,7 +83,7 @@ class Perceptron(object):
         Returns:
             Loss tensor of type float.
         """
-        reinforcement_penalties = tf.placeholder(tf.float32, shape=[input_length, 1])
+        reinforcement_penalties = tf.placeholder(tf.float32, shape=[1, 1])
         # Calculate the average reinforcement loss across the batch.
         reinforcement_loss = tf.reduce_mean(tf.matmul(reinforcement_penalties, logits), name='cross_entropy')
         tf.add_to_collection('losses', reinforcement_loss)
@@ -123,24 +128,25 @@ class Perceptron(object):
             # do greedy first, so first one.
         """
         input_vectors = self.handle_input(input_vectors)
-        for output_vector, input_vector in zip(input_vectors, shadho_output):
+        for input_vector, output_vector,  in zip(input_vectors, shadho_output):
             # optional: transform the shadho_output in some way
             #output_vector = self.transform_shadho_output(output_vector, . . . )
+            output_vector = self.handle_output(output_vector)
             self.sess.run(self.train_op, feed_dict={self.reinforcement_penalties: output_vector, self.network_input: input_vector})
 
     def predict(self, input_vectors):
         input_vectors = self.handle_input(input_vectors)
         logit_list = []
         for input_vector in input_vectors:
-            logit_list.append(self.sess.run(logits, feed_dict = {self.network_input : input_vector}))
+            logit_list.append(self.sess.run(self.softmax_linear, feed_dict = {self.network_input : input_vector}))
         # outputs log probabilities, convert to non-log probabilities
-        logit_list = [logits.apply(lambda x: np.e ** x / np.sum(np.e**x), axis=1) for logits in logit_list]
+        logit_list = [np.e ** logits / np.sum(np.e**logits) for logits in logit_list]
         return logit_list,  self.generate_schedule(input_vectors, logit_list)
 
     def generate_schedule(self, input_vectors, logit_list):
         # TODO deterministic decision
         # top 2 models per ccs
-        return {np.where(input_vectors[i][0:len(self.model_ids)])[0][0]:comput_class_idx[np.argsort(l)[-2:]] for i, l  in enumerate(logit_list)}
+        return {np.where(input_vectors[i][0:len(self.model_ids)])[0][0]:self.compute_class_ids[np.argsort(l)[-2:]] for i, l  in enumerate(logit_list)}
 
     def close():
         self.sess.close()
