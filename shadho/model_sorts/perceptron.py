@@ -139,7 +139,9 @@ class Perceptron(object):
 
 
     def predict(self, input_vectors):
+        print(input_vectors[0][0])
         input_vectors = self.handle_input(input_vectors)
+        print(input_vectors[0][0])
         logit_list = []
         for input_vector in input_vectors:
             logit_list.append(self.sess.run(self.softmax_linear, feed_dict = {self.network_input : input_vector}))
