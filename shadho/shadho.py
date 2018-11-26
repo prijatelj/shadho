@@ -427,7 +427,7 @@ class Shadho(object):
                 self.ccs[ccs_key].clear()
                 # TODO learn how to pass desired ranking/priority of models to pyrameter!
                 for model_id in model_ids:
-                    self.ccs[ccs_key].add_model(self.backend[model_id]))
+                    self.ccs[ccs_key].add_model(self.backend[model_id])
                 # NOTE This does not rely on pyrameter handling local scheduling or history! More like the default version.
 
         elif model_sort=='assign_all':
