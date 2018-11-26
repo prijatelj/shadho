@@ -68,9 +68,9 @@ if __name__ == '__main__':
         runtimes.append(runtime_map[cc_id][model_id])
 
     perceptron.update(samples, runtimes)
-    logits, scheduler_state = predictions.append(perceptron.predict(samples))
+    predictions.append(perceptron.predict(samples))
 
-    print('scheduler_state = \n', scheduler_state)
+    print('scheduler_state = \n', predictions[-1][1])
 
     """
     all_samples += samples
