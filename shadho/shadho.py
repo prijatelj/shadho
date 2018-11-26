@@ -9,6 +9,7 @@ from .config import ShadhoConfig
 from .hardware import ComputeClass
 from .managers import create_manager
 
+import copy
 from collections import OrderedDict
 import json
 import os
@@ -314,6 +315,10 @@ class Shadho(object):
                 if param is not None:
                     # Encode info to map to db in the task tag
                     tag = '.'.join([result_id, model_id, cc_id])
+                    param_copy = copy.deepcopy(param)
+                    for kernel in param_copy:
+                        # Don't forget the - 1
+                        param_copy[kernel]['cores'] = cc.value - 1
                     self.manager.add_task(
                         self.cmd,
                         tag,
