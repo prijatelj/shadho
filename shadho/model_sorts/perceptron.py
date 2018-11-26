@@ -85,7 +85,8 @@ class Perceptron(object):
         """
         reinforcement_penalties = tf.placeholder(tf.float32, shape=[1, 1])
         # Calculate the average reinforcement loss across the batch.
-        reinforcement_loss = tf.reduce_mean(tf.matmul(reinforcement_penalties, logits), name='cross_entropy')
+        #reinforcement_loss = tf.reduce_mean(tf.matmul(reinforcement_penalties, logits), name='cross_entropy')
+        reinforcement_loss = tf.reduce_mean(tf.matmul(reinforcement_penalties, tf.exp(logits)), name='rl_loss')
         tf.add_to_collection('losses', reinforcement_loss)
 
         # The total loss is defined as the reinforcement loss plus all of the weight decay terms (L2 loss).
@@ -134,6 +135,9 @@ class Perceptron(object):
             output_vector = self.handle_output(output_vector)
             self.sess.run(self.train_op, feed_dict={self.reinforcement_penalties: output_vector, self.network_input: input_vector})
 
+            #print(f"post_losses: {self.sess.run(tf.get_collection('losses'), feed_dict={self.reinforcement_penalties: output_vector, self.network_input: input_vector})}")
+
+
     def predict(self, input_vectors):
         input_vectors = self.handle_input(input_vectors)
         logit_list = []
@@ -146,7 +150,9 @@ class Perceptron(object):
     def generate_schedule(self, input_vectors, logit_list):
         # TODO deterministic decision
         # top 2 models per ccs
-        return {np.where(input_vectors[i][0:len(self.model_ids)])[0][0]:self.compute_class_ids[np.argsort(l)[-2:]] for i, l  in enumerate(logit_list)}
+        print('input_vectors len = ',len(input_vectors), ' 1st 10 = ', input_vectors[:10])
+        print('logit_list len = ', len(logit_list))
+        return [{self.model_ids[np.where(input_vectors[i][0:len(self.model_ids)])[0][0]]:self.compute_class_ids[np.argsort(l)[::-1][:2]]} for i, l  in enumerate(logit_list)]
 
     def close():
         self.sess.close()

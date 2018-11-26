@@ -70,7 +70,14 @@ if __name__ == '__main__':
     perceptron.update(samples, runtimes)
     predictions.append(perceptron.predict(samples))
 
-    print('scheduler_state = \n', predictions[-1][1])
+    print('scheduler_state = \n', predictions[-1][1][-1])
+    print('prediction count = ', len(predictions), ' and ', len(predictions[0]))
+
+    for s in range(10):
+        if (10-s) < len(predictions[0][1]):
+            print(-(10-s), 'sample and scheduler prediction: ')
+            print(samples[-(10-s)])
+            print(predictions[0][1][-(10-s)])
 
     """
     all_samples += samples
