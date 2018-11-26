@@ -16,7 +16,7 @@ class Perceptron(object):
         self.network_input, self.softmax_linear = self.inference(input_length, target_levels, output_levels)
         self.total_loss, self.reinforcement_penalties= self.loss(self.softmax_linear, input_length)
 
-        self.global_step = 0
+        self.global_step = tf.Variable(0, trainable=False, name='global_step')
         self.train_op = self.train(self.total_loss, self.global_step)
         init_op = tf.group(tf.global_variables_initializer(), tf.local_variables_initializer())
 
@@ -31,8 +31,8 @@ class Perceptron(object):
 
     def handle_input(self, raw_input_vectors):
         input_vectors = []
-        for i in raw_input_vector:
-            input_vectors.append(np.array(model_id_to_onehot(i[0]) + compute_class_to_onehot(i[1]) + i[2:], dtype=float))
+        for i in raw_input_vectors:
+            input_vectors.append(np.append(np.append(self.model_id_to_onehot(i[0]), self.compute_class_to_onehot(i[1])),  i[2:]).reshape([1, -1]))
         return input_vectors
 
     def inference(self, input_length, target_levels, output_levels=None):
@@ -122,17 +122,17 @@ class Perceptron(object):
             OR average for all where vector is same length but all the same
             # do greedy first, so first one.
         """
-        input_vectors = handle_input(input_vectors)
+        input_vectors = self.handle_input(input_vectors)
         for output_vector, input_vector in zip(input_vectors, shadho_output):
             # optional: transform the shadho_output in some way
             #output_vector = self.transform_shadho_output(output_vector, . . . )
-            self.sess.run(self.train_op, feed_dict={self.reinforcement_penalty_handle: output_vector, self.input_handle: input_vector})
+            self.sess.run(self.train_op, feed_dict={self.reinforcement_penalties: output_vector, self.network_input: input_vector})
 
     def predict(self, input_vectors):
-        input_vectors = handle_input(input_vectors)
+        input_vectors = self.handle_input(input_vectors)
         logit_list = []
         for input_vector in input_vectors:
-            logit_list.append(self.sess.run(logits, feed_dict = {self.input_handle : input_vector}))
+            logit_list.append(self.sess.run(logits, feed_dict = {self.network_input : input_vector}))
         # outputs log probabilities, convert to non-log probabilities
         logit_list = [logits.apply(lambda x: np.e ** x / np.sum(np.e**x), axis=1) for logits in logit_list]
         return logit_list,  self.generate_schedule(input_vectors, logit_list)
