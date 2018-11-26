@@ -390,7 +390,7 @@ class Shadho(object):
             key = list(self.ccs.keys())[0]
             self.ccs[key].model_group = self.backend
         elif model_sort == 'uniform_random':
-            compute_class_id_to_models = model_sorts.random.uniform(list(self.backend.models.keys()), list(self.ccs.keys()))
+            compute_class_id_to_models = model_sorts.random_sort.uniform(list(self.backend.models.keys()), list(self.ccs.keys()))
 
             for ccs_key, model_ids in compute_class_id_to_models.items():
                 self.ccs[ccs_key].clear()

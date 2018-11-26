@@ -9,13 +9,15 @@ class Perceptron(object):
     Online reinforcement learning perceptron for mapping models to compute
     classes
     """
-    def __init__(self, input_length, model_ids, compute_class_ids, *args, **kwargs):
+    def __init__(self, input_length, target_levels, model_ids, compute_class_ids, output_levels=None, *args, **kwargs):
         self.model_ids = np.array(model_ids)
         self.compute_class_ids = np.array(compute_class_ids)
 
-        self.network_input, self.softmax_linear = inference(input_length)
-        self.total_loss, self.reinforcement_penalties= loss(softmax_linear, reinforcement_penalties)
-        self.train_op = train(total_loss)
+        self.network_input, self.softmax_linear = self.inference(input_length, target_levels, output_levels)
+        self.total_loss, self.reinforcement_penalties= self.loss(self.softmax_linear, input_length)
+
+        self.global_step = 0
+        self.train_op = self.train(self.total_loss, self.global_step)
         init_op = tf.group(tf.global_variables_initializer(), tf.local_variables_initializer())
 
         self.sess = tf.Session()
@@ -27,19 +29,22 @@ class Perceptron(object):
     def compute_class_to_onehot(self, compute_class):
         return (self.compute_class_ids == compute_class).astype(int)
 
-    def handle_input(raw_input_vectors):
+    def handle_input(self, raw_input_vectors):
         input_vectors = []
         for i in raw_input_vector:
             input_vectors.append(np.array(model_id_to_onehot(i[0]) + compute_class_to_onehot(i[1]) + i[2:], dtype=float))
         return input_vectors
 
-    def inference(self, input_length):
+    def inference(self, input_length, target_levels, output_levels=None):
         """
         create the dynamic perceptron for sorting models
 
         :param input_length: the length of the input to be expected for the model
         """
-        network_input = tf.placeholder(tf.float32, shape=[input_length])
+        if output_levels is None:
+            output_levels = target_levels
+
+        network_input = tf.placeholder(tf.float32, shape=[1, input_length])
 
         with tf.variable_scope('hidden1') as scope:
             weights = tf.get_variable('hidden1_weights',shape=[input_length, 10], initializer=tf.truncated_normal_initializer(stddev=0.04))
@@ -56,14 +61,14 @@ class Perceptron(object):
             hidden2 = tf.nn.relu(tf.matmul(hidden1, weights) + biases, name=scope.name)
 
         with tf.variable_scope('softmax_linear') as scope:
-            weights = tf.get_variable('softmax_weights',shape=[10, flags.OUTPUT_LEVELS], initializer=tf.truncated_normal_initializer(stddev=1.0))
-            biases = tf.get_variable('biases', shape=[args.target_levels], initializer=tf.constant_initializer(0.0))
+            weights = tf.get_variable('softmax_weights',shape=[10, output_levels], initializer=tf.truncated_normal_initializer(stddev=1.0))
+            biases = tf.get_variable('biases', shape=[target_levels], initializer=tf.constant_initializer(0.0))
             softmax_linear = tf.add(tf.matmul(hidden2, weights), biases, name=scope.name)
 
         return network_input, softmax_linear
 
 
-    def loss(self, logits, reinforcement_penalties):
+    def loss(self, logits, input_length):
         """
         Add loss to all the trainable variables.
         Args:
@@ -73,7 +78,7 @@ class Perceptron(object):
         Returns:
             Loss tensor of type float.
         """
-        reinforcement_penalties = tf.placeholder(tf.float32, shape=[input_length])
+        reinforcement_penalties = tf.placeholder(tf.float32, shape=[input_length, 1])
         # Calculate the average reinforcement loss across the batch.
         reinforcement_loss = tf.reduce_mean(tf.matmul(reinforcement_penalties, logits), name='cross_entropy')
         tf.add_to_collection('losses', reinforcement_loss)
@@ -81,7 +86,7 @@ class Perceptron(object):
         # The total loss is defined as the reinforcement loss plus all of the weight decay terms (L2 loss).
         return tf.add_n(tf.get_collection('losses'), name='total_loss'), reinforcement_penalties
 
-    def train(total_loss, global_step, initial_learning_rate=0.1, num_epochs_per_decay=100, learning_rate_decay_factor=0.9, moving_average_decay=0.99):
+    def train(self, total_loss, global_step, initial_learning_rate=0.1, num_epochs_per_decay=100, learning_rate_decay_factor=0.9, moving_average_decay=0.99):
         """
         :param initial_learning_rate: Learning rate of perceptron
         :param num_epochs_per_decay: number of epochs to pass before decaying
@@ -96,7 +101,7 @@ class Perceptron(object):
         tf.summary.scalar('learning_rate', lr)
 
         # Compute gradients.
-        with tf.control_dependencies([loss_averages_op]):
+        with tf.control_dependencies([total_loss]):
             opt = tf.train.GradientDescentOptimizer(lr)
             grads = opt.compute_gradients(total_loss)
 

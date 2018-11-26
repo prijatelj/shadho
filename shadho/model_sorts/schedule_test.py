@@ -42,16 +42,56 @@ if __name__ == '__main__':
     #len(d_assigned_models) * 4
 
     models = ['w', 'x', 'y', 'z']
-    perceptron = Perceptron(8, models, list(runtime_map.keys()))
+    # 4 model ids, 4 cc_ids, 3 random uniforms
+    perceptron = Perceptron(11, 4, models, list(runtime_map.keys()))
+
+    scheduler_state = {
+        'a': np.random.choice(models, 2, False),
+        'b': np.random.choice(models, 2, False),
+        'c': np.random.choice(models, 2, False),
+        'd': np.random.choice(models, 2, False)
+    }
+    print('initial scheduler_state = \n', scheduler_state)
+
+    all_samples = []
+    all_runtimes = []
+    predictions = []
 
     samples = []
     runtimes = []
+    # inital sample
     for i in range(100):
-        model_id = np.random.choice(model_ids)
         cc_id = np.random.choice(list(runtime_map.keys()))
+        model_id = np.random.choice(scheduler_state[cc_id])
         rand = np.random.uniform(size=3)
         samples.append([model_id, cc_id, rand[0], rand[1], rand[2]])
         runtimes.append(runtime_map[cc_id][model_id])
 
     perceptron.update(samples, runtimes)
-    perceptron.predict(samples)
+    logits, scheduler_state = predictions.append(perceptron.predict(samples))
+
+    print('scheduler_state = \n', scheduler_state)
+
+    """
+    all_samples += samples
+    all_runtimes += runtimes
+
+    # repetitive update and predict iterations
+
+    for update_predict_iter in range(1,100):
+        samples = []
+        runtimes = []
+
+        for i in range(100):
+            model_id = np.random.choice(model_ids)
+            cc_id = np.random.choice(list(runtime_map.keys()))
+            rand = np.random.uniform(size=3)
+            samples.append([model_id, cc_id, rand[0], rand[1], rand[2]])
+            runtimes.append(runtime_map[cc_id][model_id])
+
+        perceptron.update(samples, runtimes)
+        logits, schedule = predictions.append(perceptron.predict(samples))
+
+        all_samples += samples
+        all_runtimes += runtimes
+    """
