@@ -110,6 +110,7 @@ class Shadho(object):
         self.sched_data = {}
         self.pp = pprint.PrettyPrinter(indent=2)
         self.first_modify = True
+        self.use_first_generate = True
 
         self.files = []
         if files is not None:
@@ -255,7 +256,7 @@ class Shadho(object):
         # self.global_work_percent_targets = {}
         # for mid_idx in range(len(mids)):
         #     self.global_work_percent_targets[mids[mid_idx]] = target_probs[mid_idx]
-        self.modify_probabilities(fake_cc_use='Copy')
+        self.modify_probabilities(fake_cc_use='Modify')
 
         start = time.time()
         elapsed = 0
@@ -324,6 +325,8 @@ class Shadho(object):
         generating hyperparameter values.
         """
         stop = True
+        mids = list(self.backend.model_ids)
+        mids.sort()
 
         # Generate hyperparameters for every compute class with space in queue
         for cc_id in self.ccs:
@@ -333,7 +336,13 @@ class Shadho(object):
             # Generate enough hyperparameters to fill the queue
             for i in range(n):
                 # Get bookkeeping ids and hyperparameter values
-                model_id, result_id, param = cc.generate()
+                if self.use_first_generate and i < len(mids) * 2:
+                    print(int(i / 2))
+                    a_mid = mids[int(i / 2)]
+                    model_id, result_id, param = cc.model_group.generate(a_mid)
+                    print(model_id)
+                else:
+                    model_id, result_id, param = cc.generate()
 
                 # Create a new distributed task if values were generated
                 if param is not None:
@@ -352,6 +361,7 @@ class Shadho(object):
                         value=cc.value)
                     stop = False  # Ensure that the search continues
             cc.current_tasks = cc.max_tasks  # Update to show full queue
+        self.use_first_generate = False
 
     def assign_to_ccs(self):
         """Assign trees to compute classes.
@@ -572,32 +582,42 @@ class Shadho(object):
             # return
 
         # If not everything has run yet and we're not just copying fake_ccs:
-        if (fake_cc_use == 'None' or fake_cc_use == 'Modify') and self.first_modify:
-            self.first_modify = False
-            if have_not_run > 0:  # This check is redundant if using first_modify.
-                for a_ccid in ccids:
-                    for a_mid in mids:
-                        if self.sched_data[a_ccid][a_mid]['num_runs'] == 0:
-                            self.ccs[a_ccid].model_group.models[a_mid].modified_prob = 1
-                        else:
-                            self.ccs[a_ccid].model_group.models[a_mid].modified_prob = 0.001
-                print('\"Manually\" setting probabilities.')
-                return
+        # if (fake_cc_use == 'None' or fake_cc_use == 'Modify') and self.first_modify:
+        #     self.first_modify = False
+        #     if have_not_run > 0:  # This check is redundant if using first_modify.
+        #         for a_ccid in ccids:
+        #             for a_mid in mids:
+        #                 if self.sched_data[a_ccid][a_mid]['num_runs'] == 0:
+        #                     self.ccs[a_ccid].model_group.models[a_mid].modified_prob = 1
+        #                 else:
+        #                     self.ccs[a_ccid].model_group.models[a_mid].modified_prob = 0.001
+        #         print('\"Manually\" setting probabilities.')
+        #         return
 
         # Step 1: Get info nicely into matrices (row = cc, col = model)
         global_prob_matrix = []
         global_avg_matrix = []
         global_job_per_time_matrix = []
         global_percent_running_matrix = []
+        global_lock_matrix = []
 
         for a_ccid in ccids:
             if fake_cc_use != 'None':
                 compute_class_model_probabilities = self.fake_ccs[self.real_to_fake_ccids[a_ccid]].get_probabilities(modified=False)
                 for a_mid in mids:
                     if a_mid not in compute_class_model_probabilities:
-                        compute_class_model_probabilities[a_mid] = 0
+                        compute_class_model_probabilities[a_mid] = 1.0 / 1024.0
             else:
                 compute_class_model_probabilities = self.ccs[a_ccid].get_probabilities(modified=False)
+
+            # Global lock constraints:
+            lock_values = []
+            for a_mid in mids:
+                if self.sched_data[a_ccid][a_mid]['num_runs'] == 0:
+                    lock_values.append(True)
+                else:
+                    lock_values.append(False)
+            global_lock_matrix.append(lock_values)
 
             # The following modification IS NOT ACTUALLY CORRECT. NOR IS IT DOING ANYTHING.
             # Rather, it exists to give an estimate of the speedup we'll get.
@@ -613,11 +633,11 @@ class Shadho(object):
                 if self.sched_data[a_ccid][a_mid]['num_runs'] > 0:
                     # If it has been run here but not on other ccs, say this one is slow to motivate
                     # putting it elsewhere.
-                    if a_mid in have_not_run_on_all_ccs:
-                        avg_row.append(2.0)
-                    else:
+                    # if a_mid in have_not_run_on_all_ccs:
+                    #     avg_row.append(2.0)
+                    # else:
                         # Max_avg_runtime is simply used to make the values less extreme.
-                        avg_row.append(self.sched_data[a_ccid][a_mid]['avg_runtime'] / float(max_avg_runtime))
+                    avg_row.append(self.sched_data[a_ccid][a_mid]['avg_runtime'] / float(max_avg_runtime))
                 else:
                     if min_avg_runtime is None:
                         avg_row.append(1.0)
@@ -678,13 +698,18 @@ class Shadho(object):
         percent_sum_values = []
         percent_geq_rows = []
         percent_geq_values = []
+        locking_rows = []
+        locking_values = []
         for cc_idx in range(num_ccs):
             sum_row = [0 for i in range(vector_size)]
             for m_idx in range(num_models):
                 vector_idx = m_idx * num_ccs + cc_idx
                 sum_row[vector_idx] = 1.0
-                percent_geq_rows.append([-1.0 if i == vector_idx else 0 for i in range(vector_size)])
+                percent_geq_rows.append([-1.0 if i == vector_idx else 0.0 for i in range(vector_size)])
                 percent_geq_values.append(0.0)
+                if global_lock_matrix[cc_idx][m_idx]:
+                    locking_rows.append([1.0 if i == vector_idx else 0.0 for i in range(vector_size)])
+                    locking_values.append(global_percent_running_matrix[cc_idx][m_idx])
             percent_sum_rows.append(sum_row)
             percent_sum_values.append(1.0)
 
@@ -702,8 +727,8 @@ class Shadho(object):
             work_rows.append(work_row)
             work_values.append(0.0)
 
-        equality_constraints = percent_sum_rows + work_rows
-        equality_values = percent_sum_values + work_values
+        equality_constraints = percent_sum_rows + work_rows + locking_rows
+        equality_values = percent_sum_values + work_values + locking_values
         leq_constraints = percent_geq_rows
         leq_values = percent_geq_values
 
@@ -805,7 +830,7 @@ class Shadho(object):
         self.ccs[ccid].register_result(model_id, result_id, loss, results)
 
         self.update_sched_data(ccid, model_id, results)
-        self.modify_probabilities(fake_cc_use='Copy')
+        self.modify_probabilities(fake_cc_use='Modify')
 
         # Reassign models to CCs at some frequency
         if self.backend.result_count % 10 == 0:
