@@ -151,7 +151,7 @@ class Perceptron(object):
         # TODO deterministic decision
         # top 2 models per ccs
         print('input_vectors len = ',len(input_vectors), ' 1st 10 = ', input_vectors[:10])
-        print('logit_list len = ', len(logit_list))
+        print('logit_list len = ', len(logit_list), ' 1st 10 = ', logit_list[:10])
         return [{self.model_ids[np.where(input_vectors[i][0:len(self.model_ids)])[0][0]]:self.compute_class_ids[np.argsort(l)[::-1][:2]]} for i, l  in enumerate(logit_list)]
 
     def close():
