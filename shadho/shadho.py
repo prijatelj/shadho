@@ -116,18 +116,20 @@ class Shadho(object):
         self.use_priority = use_priority
         self.timeout = timeout if timeout is not None and timeout >= 0 \
                        else float('inf')
-        self.max_tasks = 2 * max_tasks
+        self.max_tasks = 2 * max_tasks # TODO set adjustable max tasks mod
         self.max_resubmissions = max_resubmissions
         self.await_pending = await_pending
         self.update_frequency = update_frequency
         self.checkpoint_frequency = checkpoint_frequency
+
         self.model_sort = model_sort
         self.init_model_sort = init_model_sort
         self.pyrameter_model_sort = pyrameter_model_sort
 
         # Store all memory necessary for sorting models dynamically.
         #if model_sort == 'dynamic_perceptron':
-        #    self.model_sort_memory = init_dynamic_perceptron()
+        #    self.model_sorter = init_dynamic_perceptron()
+        #    self.model_sorter = model_sorts.perceptron.Perceptron()
         #else:
         #    self.model_sort_memory = None
 
@@ -383,10 +385,18 @@ class Shadho(object):
 
         # NOTE Ideal for testing is use SHADHO args to easily switch scheduler
         # If only one CC exists, do nothing; otherwise, update assignments
+        # TODO learn how to pass desired ranking/priority of models to pyrameter!
         if len(self.ccs) == 1:
             key = list(self.ccs.keys())[0]
             self.ccs[key].model_group = self.backend
-        elif model_sort == 'online_reinforcement_svm':
+        elif model_sort == 'uniform_random':
+            compute_class_id_to_models = model_sorts.random.uniform(list(self.backend.models.keys()), list(self.ccs.keys()))
+
+            for ccs_key, model_ids in compute_class_id_to_models.items():
+                self.ccs[ccs_key].clear()
+                for model_id in model_ids:
+                    self.ccs[ccs_key].add_model(self.backend[model_id])
+        elif model_sort == 'perceptron': # online reinforcement learning
             # TODO create new assignment
             # when initialized randomize which model gets assigned to what 2 ccs
             # when updating, pass or somehow give the desired mapping,
@@ -417,7 +427,7 @@ class Shadho(object):
                 self.ccs[ccs_key].clear()
                 # TODO learn how to pass desired ranking/priority of models to pyrameter!
                 for model_id in model_ids:
-                    self.ccs[ccs_key].add_model(self.backend[model_id].copy())
+                    self.ccs[ccs_key].add_model(self.backend[model_id]))
                 # NOTE This does not rely on pyrameter handling local scheduling or history! More like the default version.
 
         elif model_sort=='assign_all':
@@ -427,7 +437,7 @@ class Shadho(object):
             for key in list(self.ccs.keys()):
                 self.ccs[key].clear()
                 for mid in self.backend.model_ids:
-                    self.ccs[key].add_model(self.backend[mid].copy(parent_inherits_results=True))
+                    self.ccs[key].add_model(self.backend[mid].copy(parent_inherits_results=True)) # NOTE this will crash if pyrameter version does not support this.
         else: # self.model_sort is None or self.model_sort == 'default':
             # Sort models in the search by complexity, priority, or both and
             # get the updated order.
