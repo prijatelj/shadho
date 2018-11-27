@@ -68,10 +68,18 @@ if __name__ == '__main__':
         model_id = np.random.choice(scheduler_state[cc_id])
         rand = np.random.uniform(size=3)
         samples.append([model_id, cc_id, rand[0], rand[1], rand[2]])
-        runtimes.append(runtime_map[cc_id][model_id])
 
+    # get predictions' runtimes and update.
     predictions.append(perceptron.predict(samples))
+    for pred in prediction[0][1]:
+        model_id = list(pred.keys())[0]
+        for cc_id in list(pred.values())[0]:
+            runtimes.append(runtime_map[cc_id][model_id])
     perceptron.update(samples, runtimes)
+
+    # update the scheduler_state
+    #for model in models:
+
 
     #print('scheduler_state = \n', predictions[-1][1])
     print('scheduler_state = \n', predictions[-1][1][-1])
@@ -93,15 +101,20 @@ if __name__ == '__main__':
         samples = []
         runtimes = []
 
+        # generate samples
         for i in range(100):
             model_id = np.random.choice(models)
             cc_id = np.random.choice(compute_classes)
             rand = np.random.uniform(size=3)
             samples.append([model_id, cc_id, rand[0], rand[1], rand[2]])
-            runtimes.append(runtime_map[cc_id][model_id])
 
-        perceptron.update(samples, runtimes)
+        # get predictions' runtimes and update.
         predictions.append(perceptron.predict(samples))
+        for pred in prediction[update_predict_iter][1]:
+            model_id = list(pred.keys())[0]
+            for cc_id in list(pred.values())[0]:
+                runtimes.append(runtime_map[cc_id][model_id])
+        perceptron.update(samples, runtimes)
 
         all_samples += samples
         all_runtimes += runtimes
