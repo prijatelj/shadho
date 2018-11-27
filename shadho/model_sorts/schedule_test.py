@@ -43,8 +43,10 @@ if __name__ == '__main__':
     #len(d_assigned_models) * 4
 
     models = ['w', 'x', 'y', 'z']
+    compute_classes = ['a', 'b', 'c', 'd']
+
     # 4 model ids, 4 cc_ids, 3 random uniforms
-    perceptron = Perceptron(11, 4, models, list(runtime_map.keys()))
+    perceptron = Perceptron(11, 4, models, list(compute_classes))
 
     scheduler_state = {
         'a': np.random.choice(models, 2, False),
@@ -62,7 +64,7 @@ if __name__ == '__main__':
     runtimes = []
     # inital sample
     for i in range(100):
-        cc_id = np.random.choice(list(runtime_map.keys()))
+        cc_id = np.random.choice(list(compute_classes))
         model_id = np.random.choice(scheduler_state[cc_id])
         rand = np.random.uniform(size=3)
         samples.append([model_id, cc_id, rand[0], rand[1], rand[2]])
@@ -71,7 +73,14 @@ if __name__ == '__main__':
     perceptron.update(samples, runtimes)
     predictions.append(perceptron.predict(samples))
 
-    print('scheduler_state = \n', predictions[-1][1])
+    print('scheduler_state = \n', predictions[-1][1][-1])
+    print('prediction count = ', len(predictions), ' and ', len(predictions[0]))
+
+    for s in range(10):
+        if (10-s) < len(predictions[0][1]):
+            print(-(10-s), 'sample and scheduler prediction: ')
+            print(samples[-(10-s)])
+            print(predictions[0][1][-(10-s)])
 
     """
     all_samples += samples
@@ -85,7 +94,7 @@ if __name__ == '__main__':
 
         for i in range(100):
             model_id = np.random.choice(model_ids)
-            cc_id = np.random.choice(list(runtime_map.keys()))
+            cc_id = np.random.choice(list(compute_classes))
             rand = np.random.uniform(size=3)
             samples.append([model_id, cc_id, rand[0], rand[1], rand[2]])
             runtimes.append(runtime_map[cc_id][model_id])
