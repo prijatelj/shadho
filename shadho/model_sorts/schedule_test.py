@@ -1,5 +1,6 @@
 import numpy as np
 
+
 from perceptron import Perceptron
 
 if __name__ == '__main__':

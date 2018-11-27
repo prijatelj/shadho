@@ -4,6 +4,8 @@ Online reinforcement learning perceptron using mini-batching
 import numpy as np
 import tensorflow as tf
 
+from IPython.core.debugger import Tracer
+
 class Perceptron(object):
     """
     Online reinforcement learning perceptron for mapping models to compute
@@ -114,11 +116,11 @@ class Perceptron(object):
         apply_gradient_op = opt.apply_gradients(grads, global_step=global_step)
 
         # Track the moving averages of all trainable variables.
-        variable_averages = tf.train.ExponentialMovingAverage(moving_average_decay, global_step)
-        with tf.control_dependencies([apply_gradient_op]):
-            variables_averages_op = variable_averages.apply(tf.trainable_variables())
-
-        return variables_averages_op
+        #variable_averages = tf.train.ExponentialMovingAverage(moving_average_decay, global_step)
+        #with tf.control_dependencies([apply_gradient_op]):
+        #    variables_averages_op = variable_averages.apply(tf.trainable_variables())
+        return apply_gradient_op
+        #return variables_averages_op
 
     def update(self, input_vectors, shadho_output):
         """
@@ -138,6 +140,7 @@ class Perceptron(object):
         input_vectors = self.handle_input(input_vectors)
         logit_list = []
         for input_vector in input_vectors:
+            Tracer()()
             logit_list.append(self.sess.run(self.softmax_linear, feed_dict = {self.network_input : input_vector}))
         # outputs log probabilities, convert to non-log probabilities
         logit_list = [np.e ** logits / np.sum(np.e**logits) for logits in logit_list]
