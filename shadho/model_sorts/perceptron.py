@@ -74,7 +74,6 @@ class Perceptron(object):
 
         return network_input, softmax_linear
 
-
     def loss(self, logits, input_length):
         """
         Add loss to all the trainable variables.
