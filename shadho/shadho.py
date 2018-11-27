@@ -322,7 +322,7 @@ class Shadho(object):
                     self.manager.add_task(
                         self.cmd,
                         tag,
-                        param,
+                        param_copy,
                         files=self.files,
                         resource=cc.resource,
                         value=cc.value)
