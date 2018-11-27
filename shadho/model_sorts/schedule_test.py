@@ -70,20 +70,20 @@ if __name__ == '__main__':
         samples.append([model_id, cc_id, rand[0], rand[1], rand[2]])
         runtimes.append(runtime_map[cc_id][model_id])
 
-    predictions = perceptron.predict(samples)
+    predictions.append(perceptron.predict(samples))
     perceptron.update(samples, runtimes)
 
-    print('scheduler_state = \n', predictions[-1][1])
-    #print('scheduler_state = \n', predictions[-1][1][-1])
+    #print('scheduler_state = \n', predictions[-1][1])
+    print('scheduler_state = \n', predictions[-1][1][-1])
     #print('prediction count = ', len(predictions), ' and ', len(predictions[0]))
 
     for s in range(10):
-        if (10-s) < len(predictions[1]):
+        if (10-s) < len(predictions[0][1]):
             print(-(10-s), 'sample and scheduler prediction: ')
             print(samples[-(10-s)])
-            print(predictions[1][-(10-s)])
+            print(predictions[0][1][-(10-s)])
 
-    """
+    #"""
     all_samples += samples
     all_runtimes += runtimes
 
@@ -94,15 +94,22 @@ if __name__ == '__main__':
         runtimes = []
 
         for i in range(100):
-            model_id = np.random.choice(model_ids)
-            cc_id = np.random.choice(list(compute_classes))
+            model_id = np.random.choice(models)
+            cc_id = np.random.choice(compute_classes)
             rand = np.random.uniform(size=3)
             samples.append([model_id, cc_id, rand[0], rand[1], rand[2]])
             runtimes.append(runtime_map[cc_id][model_id])
 
         perceptron.update(samples, runtimes)
-        logits, schedule = predictions.append(perceptron.predict(samples))
+        predictions.append(perceptron.predict(samples))
 
         all_samples += samples
         all_runtimes += runtimes
-    """
+
+
+        for s in range(10):
+            if (10-s) < len(predictions[update_predict_iter][1]):
+                print(-(10-s), 'sample and scheduler prediction: ')
+                print(samples[-(10-s)])
+                print(predictions[update_predict_iter][1][-(10-s)])
+    #"""
