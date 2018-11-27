@@ -146,10 +146,12 @@ class Perceptron(object):
         print(input_vectors[0][0])
         logit_list = []
         for input_vector in input_vectors:
-            Tracer()()
+            #Tracer()()
             logit_list.append(self.sess.run(self.softmax_linear, feed_dict = {self.network_input : input_vector}))
         # outputs log probabilities, convert to non-log probabilities
         logit_list = [np.e ** logits / np.sum(np.e**logits) for logits in logit_list]
+        logit_list = [np.squeeze(logits) for logits in logit_list]
+
         return logit_list,  self.generate_schedule(input_vectors, logit_list)
 
     def generate_schedule(self, input_vectors, logit_list):
@@ -157,7 +159,8 @@ class Perceptron(object):
         # top 2 models per ccs
         print('input_vectors len = ',len(input_vectors), ' 1st 10 = ', input_vectors[:10])
         print('logit_list len = ', len(logit_list), ' 1st 10 = ', logit_list[:10])
-        return [{self.model_ids[np.where(input_vectors[i][0:len(self.model_ids)])[0][0]]:self.compute_class_ids[np.argsort(l)[::-1][:2]]} for i, l  in enumerate(logit_list)]
+        #return [{self.model_ids[np.where(input_vectors[i][0:len(self.model_ids)])[0][0]]:self.compute_class_ids[np.argsort(l)[::-1][:2]]} for i, l  in enumerate(logit_list)]
+        return [ {self.model_ids[np.where(x[0][0:len(self.model_ids)])[0][0]] : self.compute_class_ids[np.argsort(y)[::-1][:2]]} for x,y in zip(input_vectors,logit_list)]
 
     def close():
         self.sess.close()
