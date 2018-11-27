@@ -12,6 +12,9 @@ class Perceptron(object):
     classes
     """
     def __init__(self, input_length, target_levels, model_ids, compute_class_ids, output_levels=None, *args, **kwargs):
+        self.pred_queue = [] # list of predictions from scheduler
+        self.pred_queue_idx = 0
+
         self.model_ids = np.array(model_ids)
         self.compute_class_ids = np.array(compute_class_ids)
 
@@ -24,6 +27,18 @@ class Perceptron(object):
 
         self.sess = tf.Session()
         self.sess.run(init_op)
+
+    @property
+    def next_pred(self):
+        """Returns current value and moves pointer to next index."""
+        pred = self.pred_queue[self.pred_queue_idx] if self.pred_queue else None
+        self.pred_queue_idx = 0 if self.pred_queue_idx >= len(self.pred_queue) else self.pred_queue_idx + 1
+        return pred
+
+    def update_pred_queue(self, preds):
+        """Sets pred_queue to provided list of predictions."""
+        self.pred_queue = preds
+        self.pred_queue_idx = 0
 
     def model_id_to_onehot(self, model_id):
         return (self.model_ids == model_id).astype(int)
@@ -151,7 +166,9 @@ class Perceptron(object):
         logit_list = [np.e ** logits / np.sum(np.e**logits) for logits in logit_list]
         logit_list = [np.squeeze(logits) for logits in logit_list]
 
-        return logit_list,  self.generate_schedule(input_vectors, logit_list)
+        preds = self.generate_schedule(input_vectors, logit_list)
+        self.update_pred_queue(preds)
+        return logit_list, preds
 
     def generate_schedule(self, input_vectors, logit_list):
         # TODO deterministic decision

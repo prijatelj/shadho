@@ -333,7 +333,12 @@ class Shadho(object):
             # Generate enough hyperparameters to fill the queue
             for i in range(n):
                 # Get bookkeeping ids and hyperparameter values
-                model_id, result_id, param = cc.generate()
+                if self.model_sort == 'live_perceptron':
+                    # run scheduler's specific model to cc assignments.
+                    # pop from the pred_queue which is a python list
+                    model_id, result_id, param = cc.generate(self.perceptron.next_pred)
+                else:
+                    model_id, result_id, param = cc.generate()
 
                 # Create a new distributed task if values were generated
                 if param is not None:
@@ -420,15 +425,23 @@ class Shadho(object):
 
             # either send entire SHADHO object, or only models + sample data
             # TODO in progress at the moment and will require memory!
-            ccs_to_model_id = model_sorts.online_reinforcement_svm(self)
+            #ccs_to_model_id = model_sorts.online_reinforcement_svm(self)
             # Reassign the models in each ccs based on sort method
             # either return a dict of model_id to list(ccs), or do it w/in func
-            for ccs_key, model_ids in self.ccs.items():
-                self.ccs[ccs_key].clear()
-                # TODO learn how to pass desired ranking/priority of models to pyrameter!
-                for model_id in model_ids:
-                    self.ccs[ccs_key].add_model(self.backend[model_id])
+            #for ccs_key, model_ids in self.ccs.items():
+            #    self.ccs[ccs_key].clear()
+
+            #    for model_id in model_ids:
+            #        self.ccs[ccs_key].add_model(self.backend[model_id])
                 # NOTE This does not rely on pyrameter handling local scheduling or history! More like the default version.
+
+           # NOTE live_perceptron will not reassign models to ccs ever because it
+           # explicitly controls what models are run where. This time is used for
+           # updating the scheduler and generating the new predictions
+           # TODO
+           self.perceptron.update()
+           self.perceptron.predict()
+           # now go an run the new predictions and return eventually with runtimes
 
         elif model_sort=='assign_all':
             # NOTE this is an expensive operation when repetively called & doing
@@ -437,7 +450,9 @@ class Shadho(object):
             for key in list(self.ccs.keys()):
                 self.ccs[key].clear()
                 for mid in self.backend.model_ids:
-                    self.ccs[key].add_model(self.backend[mid].copy(parent_inherits_results=True)) # NOTE this will crash if pyrameter version does not support this.
+                    self.ccs[key].add_model(self.backend[mid]) # for init assign
+                    #self.ccs[key].add_model(self.backend[mid].copy(parent_inherits_results=True)) # NOTE this will crash if pyrameter version does not support this.
+
         else: # self.model_sort is None or self.model_sort == 'default':
             # Sort models in the search by complexity, priority, or both and
             # get the updated order.
