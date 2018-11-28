@@ -152,9 +152,10 @@ class Perceptron(object):
             # do greedy first, so first one.
         """
         models = [x[0] for x in input_vectors]
+        cc_ids = [x[1] for x in input_vectors]
         input_vectors = self.handle_input(input_vectors)
 
-        for input_vector, output_vector, model  in zip(input_vectors, shadho_output, models):
+        for input_vector, output_vector, model, cc  in zip(input_vectors, shadho_output, models, cc_ids):
             output_vector = self.handle_output(output_vector)
 
             if self.param_averages[model] is None:
@@ -164,7 +165,7 @@ class Perceptron(object):
                 self.param_averages[model] = input_vector * (1-self.decay_lambda) + self.param_averages[model] * self.decay_lambda
                 self.time_averages[model] = output_vector * (1-self.decay_lambda) + self.time_averages[model] * self.decay_lambda
 
-            rl_vector = ((output_vector - self.time_averages[model])  * self.model_id_to_onehot(model)).reshape(1,-1)
+            rl_vector = ((output_vector - self.time_averages[model])  * self.compute_class_to_onehot(cc)).reshape(1,-1)
 
             self.sess.run(self.train_op, feed_dict={self.reinforcement_penalties: rl_vector, self.network_input: input_vector})
             print(f"rl_vector: {rl_vector} | post_losses: {self.sess.run(tf.get_collection('losses'), feed_dict={self.reinforcement_penalties: rl_vector, self.network_input: input_vector})}")
