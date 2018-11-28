@@ -112,8 +112,8 @@ if __name__ == '__main__':
 
     # inverse the dictionary into compute_class to models, as SHADHO expects
     # assumes that this includes all compute classes, if not, make point to empty
-    scheduler_state = update_scheduler_state(predictions[0][1], scheduler_state)
-    print('scheduler_state = \n', scheduler_state)
+    #scheduler_state = update_scheduler_state(predictions[0][1], scheduler_state)
+    #print('scheduler_state = \n', scheduler_state)
     #print('scheduler_state = \n', predictions[-1][1][-1])
 
     # print out most recent 10 samples and their associated predictions

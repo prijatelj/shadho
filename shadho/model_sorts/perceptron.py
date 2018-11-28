@@ -1,4 +1,4 @@
-"""
+﻿"""
 Online reinforcement learning perceptron using mini-batching
 """
 import numpy as np
@@ -11,15 +11,19 @@ class Perceptron(object):
     Online reinforcement learning perceptron for mapping models to compute
     classes
     """
-    def __init__(self, input_length, target_levels, model_ids, compute_class_ids, output_levels=None, *args, **kwargs):
+    def __init__(self, input_length, target_levels, model_ids, compute_class_ids, output_levels=None, decay_lambda = 0.9, *args, **kwargs):
         self.pred_queue = [] # list of predictions from scheduler
         self.pred_queue_idx = 0
 
         self.model_ids = np.array(model_ids)
         self.compute_class_ids = np.array(compute_class_ids)
 
+        self.decay_lambda = decay_lambda # global decay factor for all moving averages
+        self.param_averages = {x:None for x in model_ids}
+        self.time_averages = {x:None for x in model_ids}
+
         self.network_input, self.softmax_linear = self.inference(input_length, target_levels, output_levels)
-        self.total_loss, self.reinforcement_penalties= self.loss(self.softmax_linear, input_length)
+        self.total_loss, self.reinforcement_penalties= self.loss(self.softmax_linear, input_length, target_levels)
 
         self.global_step = tf.Variable(0, trainable=False, name='global_step')
         self.train_op = self.train(self.total_loss, self.global_step)
@@ -55,7 +59,8 @@ class Perceptron(object):
 
     def handle_output(self, raw_output):
         """Handles single raw_output value."""
-        return np.asarray(raw_output, dtype=float).reshape([1,1])
+        # return np.asarray(raw_output, dtype=float).reshape([1,1])
+        return np.asarray(raw_output, dtype=float)
 
     def inference(self, input_length, target_levels, output_levels=None):
         """
@@ -89,7 +94,7 @@ class Perceptron(object):
 
         return network_input, softmax_linear
 
-    def loss(self, logits, input_length):
+    def loss(self, logits, input_length, target_levels):
         """
         Add loss to all the trainable variables.
         Args:
@@ -99,10 +104,10 @@ class Perceptron(object):
         Returns:
             Loss tensor of type float.
         """
-        reinforcement_penalties = tf.placeholder(tf.float32, shape=[1, 1])
+        reinforcement_penalties = tf.placeholder(tf.float32, shape=[1, target_levels])
         # Calculate the average reinforcement loss across the batch.
         #reinforcement_loss = tf.reduce_mean(tf.matmul(reinforcement_penalties, logits), name='cross_entropy')
-        reinforcement_loss = tf.reduce_mean(tf.matmul(reinforcement_penalties, tf.exp(logits)), name='rl_loss')
+        reinforcement_loss = tf.reduce_mean(tf.matmul(reinforcement_penalties, tf.exp(logits),transpose_a=True), name='rl_loss')
         tf.add_to_collection('losses', reinforcement_loss)
 
         # The total loss is defined as the reinforcement loss plus all of the weight decay terms (L2 loss).
@@ -144,15 +149,23 @@ class Perceptron(object):
             OR average for all where vector is same length but all the same
             # do greedy first, so first one.
         """
+        models = [x[0] for x in input_vectors]
         input_vectors = self.handle_input(input_vectors)
-        for input_vector, output_vector,  in zip(input_vectors, shadho_output):
-            # optional: transform the shadho_output in some way
-            #output_vector = self.transform_shadho_output(output_vector, . . . )
+
+        for input_vector, output_vector, model  in zip(input_vectors, shadho_output, models):
             output_vector = self.handle_output(output_vector)
-            self.sess.run(self.train_op, feed_dict={self.reinforcement_penalties: output_vector, self.network_input: input_vector})
 
-            #print(f"post_losses: {self.sess.run(tf.get_collection('losses'), feed_dict={self.reinforcement_penalties: output_vector, self.network_input: input_vector})}")
+            if self.param_averages[model] is None:
+                self.param_averages[model] = input_vector
+                self.time_averages[model] = output_vector
+            else:
+                self.param_averages[model] = input_vector * (1-self.decay_lambda) + self.param_averages[model] * self.decay_lambda
+                self.time_averages[model] = output_vector * (1-self.decay_lambda) + self.time_averages[model] * self.decay_lambda
 
+            rl_vector = ((output_vector - self.time_averages[model])  * self.model_id_to_onehot(model)).reshape(1,-1)
+
+            self.sess.run(self.train_op, feed_dict={self.reinforcement_penalties: rl_vector, self.network_input: input_vector})
+            print(f"rl_vector: {rl_vector} | post_losses: {self.sess.run(tf.get_collection('losses'), feed_dict={self.reinforcement_penalties: rl_vector, self.network_input: input_vector})}")
 
     def predict(self, input_vectors):
         print(input_vectors[0][0])
@@ -160,7 +173,6 @@ class Perceptron(object):
         print(input_vectors[0][0])
         logit_list = []
         for input_vector in input_vectors:
-            #Tracer()()
             logit_list.append(self.sess.run(self.softmax_linear, feed_dict = {self.network_input : input_vector}))
         # outputs log probabilities, convert to non-log probabilities
         logit_list = [np.e ** logits / np.sum(np.e**logits) for logits in logit_list]
@@ -176,7 +188,7 @@ class Perceptron(object):
         print('input_vectors len = ',len(input_vectors), ' 1st 10 = ', input_vectors[:10])
         print('logit_list len = ', len(logit_list), ' 1st 10 = ', logit_list[:10])
         #return [{self.model_ids[np.where(input_vectors[i][0:len(self.model_ids)])[0][0]]:self.compute_class_ids[np.argsort(l)[::-1][:2]]} for i, l  in enumerate(logit_list)]
-        return [ {self.model_ids[np.where(x[0][0:len(self.model_ids)])[0][0]] : self.compute_class_ids[np.argsort(y)[::-1][:2]]} for x,y in zip(input_vectors,logit_list)]
+        return [{self.model_ids[np.where(x[0][0:len(self.model_ids)])[0][0]] : self.compute_class_ids[np.argsort(y)[::-1][:2]]} for x,y in zip(input_vectors,logit_list)]
 
     def close():
         self.sess.close()
