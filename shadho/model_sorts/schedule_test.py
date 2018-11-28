@@ -21,20 +21,27 @@ def convert_predictions_to_schedule(model_to_compute_classes):
                 compute_class_to_models[compute_class_id] = np.append(compute_class_to_models[compute_class_id], model_id)
     return compute_class_to_models
 
-def create_samples(scheduler_state):
+def create_samples(scheduler_state, preds=None):
     new_samples = []
-    for cc_id in scheduler_state: # 16 = 4*4
-        for model_id in scheduler_state[cc_id]:
-            rand = np.random.uniform(size=3) # Noise vars
-            new_samples.append([model_id, cc_id, rand[0], rand[1], rand[2]])
+    if preds is None:
+        for cc_id in scheduler_state: # 16 = 4*4
+            for model_id in scheduler_state[cc_id]:
+                rand = np.random.uniform(size=3) # Noise vars
+                new_samples.append([model_id, cc_id, rand[0], rand[1], rand[2]])
+    else: # simulate running exact prediction by adding instnace features
+        for pred in preds: # ignores scheduler state
+            model_id = pred[0]
+            for cc_id in pred[1:]:
+                rand = np.random.uniform(size=3)
+                new_samples.append([model_id, cc_id, rand[0], rand[1], rand[2]])
 
     return new_samples
 
 def get_runtimes(predictions, runtime_map):
     new_runtimes = []
     for pred in predictions:
-        model_id = list(pred.keys())[0]
-        for cc_id in list(pred.values())[0]:
+        model_id = pred[0]
+        for cc_id in pred[1:]:
             new_runtimes.append(runtime_map[cc_id][model_id])
     return new_runtimes
 
@@ -131,20 +138,20 @@ if __name__ == '__main__':
     # repetitive update and predict iterations
     #
 
-    for update_itr in range(1,10):
+    for update_itr in range(1,100):
         samples = []
         runtimes = []
 
         # generate samples
-        samples.extend(create_samples(scheduler_state))
+        samples.extend(create_samples(scheduler_state, predictions[update_itr-1][1]))
 
         # get predictions' runtimes and update.
         predictions.append(perceptron.predict(samples))
         runtimes.extend(get_runtimes(predictions[update_itr][1], runtime_map))
         perceptron.update(samples, runtimes)
 
-        scheduler_state = update_scheduler_state(predictions[update_itr][1], scheduler_state)
-        print('scheduler_state = \n', scheduler_state)
+        #scheduler_state = update_scheduler_state(predictions[update_itr][1], scheduler_state)
+        #print('scheduler_state = \n', scheduler_state)
 
         # save all samples and runtimes for future reference
         all_samples += samples
