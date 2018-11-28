@@ -22,6 +22,23 @@ def convert_predictions_to_schedule(model_to_compute_classes):
                 compute_class_to_models[compute_class_id] = np.append(compute_class_to_models[compute_class_id], model_id)
     return compute_class_to_models
 
+def create_samples(scheduler_state):
+    new_samples = []
+    for cc_id in scheduler_state: # 16 = 4*4
+        for model_id in scheduler_state[cc_id]:
+            rand = np.random.uniform(size=3) # Noise vars
+            new_samples.append([model_id, cc_id, rand[0], rand[1], rand[2]])
+
+    return new_samples
+
+def get_runtimes(predictions, runtime_map):
+    new_runtimes = []
+    for pred in predictions:
+        model_id = list(pred.keys())[0]
+        for cc_id in list(pred.values())[0]:
+            new_runtimes.append(runtime_map[cc_id][model_id])
+    return new_runtimes
+
 if __name__ == '__main__':
     # 4 different compute classes (a,b,c,d)
     # 4 different models (w,x,y,z)
@@ -64,7 +81,7 @@ if __name__ == '__main__':
     models = ['model_1', 'model_2', 'model_3', 'model_4']
     compute_classes = ['cc_1', 'cc_2', 'cc_3', 'cc_4']
 
-    # 4 model ids, 4 cc_ids, 3 random uniforms
+    # Init Perceptron: 4 model ids, 4 cc_ids, 3 random uniforms
     perceptron = Perceptron(11, 4, models, list(compute_classes))
 
     # TODO initialize first state, must run all models on each compute class
@@ -73,10 +90,6 @@ if __name__ == '__main__':
         'cc_2': np.array(models),
         'cc_3': np.array(models),
         'cc_4': np.array(models)
-        #'cc_1': np.random.choice(models, 2, False),
-        #'cc_2': np.random.choice(models, 2, False),
-        #'cc_3': np.random.choice(models, 2, False),
-        #'cc_4': np.random.choice(models, 2, False)
     }
     print('initial scheduler_state = \n', scheduler_state)
 
@@ -86,38 +99,25 @@ if __name__ == '__main__':
 
     samples = []
     runtimes = []
-    # inital sample
-    #for i in range(100):
-    for cc_id in scheduler_state: # 16 = 4*4
-        #cc_id = np.random.choice(list(compute_classes))
-        #model_id = np.random.choice(scheduler_state[cc_id])
-        for model_id in scheduler_state[cc_id]:
-            rand = np.random.uniform(size=3)
-            samples.append([model_id, cc_id, rand[0], rand[1], rand[2]])
+    # create inital sample: for every cc, assign each model type.
+    samples.extend(create_samples(scheduler_state))
 
     # get predictions' runtimes and update.
     predictions.append(perceptron.predict(samples))
-    for pred in predictions[0][1]:
-        model_id = list(pred.keys())[0]
-        for cc_id in list(pred.values())[0]:
-            runtimes.append(runtime_map[cc_id][model_id])
+    runtimes.extend(get_runtimes(predictions[0][1], runtime_map))
     perceptron.update(samples, runtimes)
 
-    # TODO update the scheduler_state
-    #for model in models:
-    #inverse the dictionary into compute_class to models, as SHADHO expects
+    # inverse the dictionary into compute_class to models, as SHADHO expects
     # assumes that this includes all compute classes, if not, make point to empty
     pred_scheds = convert_predictions_to_schedule(predictions[0][1])
     scheduler_state.update(pred_scheds)
     for cc_id in compute_classes:
         if cc_id not in pred_scheds:
-            scheduler_state[cc_id] = np.array([])
+            scheduler_state[cc_id] = np.array([]) # NOTE perhaps this is a problem?
 
-
-    #print('scheduler_state = \n', predictions[-1][1])
     print('scheduler_state = \n', predictions[-1][1][-1])
-    #print('prediction count = ', len(predictions), ' and ', len(predictions[0]))
 
+    # print out most recent 10 samples and their associated predictions
     for s in range(10):
         if (10-s) < len(predictions[0][1]):
             print(-(10-s), 'sample and scheduler prediction: ')
@@ -128,32 +128,23 @@ if __name__ == '__main__':
     all_samples += samples
     all_runtimes += runtimes
 
+    #
     # repetitive update and predict iterations
+    #
 
-    for update_predict_iter in range(1,100):
+    for update_itr in range(1,10):
         samples = []
         runtimes = []
 
         # generate samples
-        #for i in range(100):
-        #    model_id = np.random.choice(models)
-        #    cc_id = np.random.choice(compute_classes)
-        #    rand = np.random.uniform(size=3)
-        #    samples.append([model_id, cc_id, rand[0], rand[1], rand[2]])
-        for cc_id in scheduler_state: # 16 = 4*4
-            for model_id in scheduler_state[cc_id]:
-                rand = np.random.uniform(size=3)
-                samples.append([model_id, cc_id, rand[0], rand[1], rand[2]])
+        samples.extend(create_samples(scheduler_state))
 
         # get predictions' runtimes and update.
         predictions.append(perceptron.predict(samples))
-        for pred in predictions[update_predict_iter][1]:
-            model_id = list(pred.keys())[0]
-            for cc_id in list(pred.values())[0]:
-                runtimes.append(runtime_map[cc_id][model_id])
+        runtimes.extend(get_runtimes(predictions[update_itr][1], runtime_map))
         perceptron.update(samples, runtimes)
 
-        pred_scheds = convert_predictions_to_schedule(predictions[update_predict_iter][1])
+        pred_scheds = convert_predictions_to_schedule(predictions[update_itr][1])
         scheduler_state.update(pred_scheds)
         for cc_id in compute_classes:
             if cc_id not in pred_scheds:
@@ -162,10 +153,10 @@ if __name__ == '__main__':
         all_samples += samples
         all_runtimes += runtimes
 
-
+        # print out most recent 10 samples and their associated predictions
         for s in range(10):
-            if (10-s) < len(predictions[update_predict_iter][1]):
+            if (10-s) < len(predictions[update_itr][1]):
                 print(-(10-s), 'sample and scheduler prediction: ')
                 print(samples[-(10-s)])
-                print(predictions[update_predict_iter][1][-(10-s)])
+                print(predictions[update_itr][1][-(10-s)])
     #"""
