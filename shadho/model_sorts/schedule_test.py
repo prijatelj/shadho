@@ -50,12 +50,10 @@ def create_samples(scheduler_state, preds=None):
 
     return new_samples
 
-def get_runtimes(predictions, runtime_map):
+def get_runtimes(samples, runtime_map):
     new_runtimes = []
-    for pred in predictions:
-        model_id = pred[0]
-        for cc_id in pred[1:]:
-            new_runtimes.append(runtime_map[cc_id][model_id])
+    for sample in samples:
+        new_runtimes.append(runtime_map[sample[1]][sample[0]])
     return new_runtimes
 
 def update_scheduler_state(predictions, scheduler_state):
@@ -126,21 +124,14 @@ if __name__ == '__main__':
     all_runtimes = []
     predictions = []
 
-    samples = []
-    runtimes = []
     # create inital sample: for every cc, assign each model type.
-    samples.extend(create_samples(scheduler_state))
+    # Initial Run: get initial samples and runtimes
+    samples = create_samples(scheduler_state)
+    runtimes = get_runtimes(samples, runtime_map)
 
-    # get predictions' runtimes and update.
-    predictions.append(perceptron.predict(samples))
-    runtimes.extend(get_runtimes(predictions[0][1], runtime_map))
+    # update and predict
     perceptron.update(samples, runtimes)
-
-    # inverse the dictionary into compute_class to models, as SHADHO expects
-    # assumes that this includes all compute classes, if not, make point to empty
-    #scheduler_state = update_scheduler_state(predictions[0][1], scheduler_state)
-    #print('scheduler_state = \n', scheduler_state)
-    #print('scheduler_state = \n', predictions[-1][1][-1])
+    predictions.append(perceptron.predict(samples))
 
     # print out most recent 10 samples and their associated predictions
     for s in range(10):
@@ -158,19 +149,13 @@ if __name__ == '__main__':
     #
 
     for update_itr in range(1,args.iterations):
-        samples = []
-        runtimes = []
+        # generate samples and their runtimes
+        samples = create_samples(scheduler_state, predictions[update_itr-1][1])
+        runtimes = get_runtimes(samples, runtime_map)
 
-        # generate samples
-        samples.extend(create_samples(scheduler_state, predictions[update_itr-1][1]))
-
-        # get predictions' runtimes and update.
-        predictions.append(perceptron.predict(samples))
-        runtimes.extend(get_runtimes(predictions[update_itr][1], runtime_map))
+        # update and predict
         perceptron.update(samples, runtimes)
-
-        #scheduler_state = update_scheduler_state(predictions[update_itr][1], scheduler_state)
-        #print('scheduler_state = \n', scheduler_state)
+        predictions.append(perceptron.predict(samples))
 
         # save all samples and runtimes for future reference
         all_samples += samples
