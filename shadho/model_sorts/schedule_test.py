@@ -29,29 +29,29 @@ if __name__ == '__main__':
     # 1-to-1 ideal is a:w, b:x, c:y, d:z.
     # However, models are able to run on multiple compute classes.
     runtime_map= {
-        'a':{
-            'w':1,
-            'x':2,
-            'y':3,
-            'z':4
+        'cc_1':{
+            'model_1':1,
+            'model_2':2,
+            'model_3':3,
+            'model_4':4
         },
-        'b':{
-            'w':4,
-            'x':1,
-            'y':2,
-            'z':3
+        'cc_2':{
+            'model_1':4,
+            'model_2':1,
+            'model_3':2,
+            'model_4':3
         },
-        'c':{
-            'w':3,
-            'x':4,
-            'y':1,
-            'z':2
+        'cc_3':{
+            'model_1':3,
+            'model_2':4,
+            'model_3':1,
+            'model_4':2
         },
-        'd':{
-            'w':2,
-            'x':3,
-            'y':4,
-            'z':1
+        'cc_4':{
+            'model_1':2,
+            'model_2':3,
+            'model_3':4,
+            'model_4':1
         },
     }
 
@@ -61,22 +61,22 @@ if __name__ == '__main__':
     #len(c_assigned_models) * 3
     #len(d_assigned_models) * 4
 
-    models = ['w', 'x', 'y', 'z']
-    compute_classes = ['a', 'b', 'c', 'd']
+    models = ['model_1', 'model_2', 'model_3', 'model_4']
+    compute_classes = ['cc_1', 'cc_2', 'cc_3', 'cc_4']
 
     # 4 model ids, 4 cc_ids, 3 random uniforms
     perceptron = Perceptron(11, 4, models, list(compute_classes))
 
     # TODO initialize first state, must run all models on each compute class
     scheduler_state = {
-        'a': np.array(models),
-        'b': np.array(models),
-        'c': np.array(models),
-        'd': np.array(models)
-        #'a': np.random.choice(models, 2, False),
-        #'b': np.random.choice(models, 2, False),
-        #'c': np.random.choice(models, 2, False),
-        #'d': np.random.choice(models, 2, False)
+        'cc_1': np.array(models),
+        'cc_2': np.array(models),
+        'cc_3': np.array(models),
+        'cc_4': np.array(models)
+        #'cc_1': np.random.choice(models, 2, False),
+        #'cc_2': np.random.choice(models, 2, False),
+        #'cc_3': np.random.choice(models, 2, False),
+        #'cc_4': np.random.choice(models, 2, False)
     }
     print('initial scheduler_state = \n', scheduler_state)
 
