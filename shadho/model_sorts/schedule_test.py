@@ -1,6 +1,5 @@
 import numpy as np
 
-
 from perceptron import Perceptron
 
 def convert_predictions_to_schedule(model_to_compute_classes):
@@ -39,6 +38,15 @@ def get_runtimes(predictions, runtime_map):
             new_runtimes.append(runtime_map[cc_id][model_id])
     return new_runtimes
 
+def update_scheduler_state(predictions, scheduler_state):
+    pred_scheds = convert_predictions_to_schedule(predictions)
+    scheduler_state.update(pred_scheds)
+    for cc_id in compute_classes:
+        if cc_id not in pred_scheds:
+            scheduler_state[cc_id] = np.array([]) # NOTE perhaps this is a problem?
+
+    return scheduler_state
+
 if __name__ == '__main__':
     # 4 different compute classes (a,b,c,d)
     # 4 different models (w,x,y,z)
@@ -72,12 +80,7 @@ if __name__ == '__main__':
         },
     }
 
-    # ascending order of classes have worse performance with more models.
-    #len(a) * 1
-    #len(b_assigned_models) * 2
-    #len(c_assigned_models) * 3
-    #len(d_assigned_models) * 4
-
+    # NOTE could increase runtime on machine w/ more models assigned to them
     models = ['model_1', 'model_2', 'model_3', 'model_4']
     compute_classes = ['cc_1', 'cc_2', 'cc_3', 'cc_4']
 
@@ -109,13 +112,9 @@ if __name__ == '__main__':
 
     # inverse the dictionary into compute_class to models, as SHADHO expects
     # assumes that this includes all compute classes, if not, make point to empty
-    pred_scheds = convert_predictions_to_schedule(predictions[0][1])
-    scheduler_state.update(pred_scheds)
-    for cc_id in compute_classes:
-        if cc_id not in pred_scheds:
-            scheduler_state[cc_id] = np.array([]) # NOTE perhaps this is a problem?
-
-    print('scheduler_state = \n', predictions[-1][1][-1])
+    scheduler_state = update_scheduler_state(predictions[0][1], scheduler_state)
+    print('scheduler_state = \n', scheduler_state)
+    #print('scheduler_state = \n', predictions[-1][1][-1])
 
     # print out most recent 10 samples and their associated predictions
     for s in range(10):
@@ -144,12 +143,10 @@ if __name__ == '__main__':
         runtimes.extend(get_runtimes(predictions[update_itr][1], runtime_map))
         perceptron.update(samples, runtimes)
 
-        pred_scheds = convert_predictions_to_schedule(predictions[update_itr][1])
-        scheduler_state.update(pred_scheds)
-        for cc_id in compute_classes:
-            if cc_id not in pred_scheds:
-                scheduler_state[cc_id] = np.array([])
+        scheduler_state = update_scheduler_state(predictions[update_itr][1], scheduler_state)
+        print('scheduler_state = \n', scheduler_state)
 
+        # save all samples and runtimes for future reference
         all_samples += samples
         all_runtimes += runtimes
 
