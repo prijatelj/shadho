@@ -189,7 +189,7 @@ class Perceptron(object):
         # top 2 models per ccs
         print('input_vectors len = ',len(input_vectors), ' 1st 10 = ', input_vectors[:10])
         print('logit_list len = ', len(logit_list), ' 1st 10 = ', logit_list[:10])
-        return [np.append(self.model_ids[np.where(x[0][0:len(self.model_ids)])[0][0]], self.compute_class_ids[np.argsort(y)[::-1][:self.top_n]]) if (np.random.uniform() > self.epsilon) else np.random.choice(range(len(self.compute_class_ids)))] for x,y in zip(input_vectors,logit_list)]
+        return [np.append(self.model_ids[np.where(x[0][0:len(self.model_ids)])[0][0]], self.compute_class_ids[np.argsort(y)[::-1][:self.top_n] if (np.random.uniform() > self.epsilon) else np.random.choice(range(len(self.compute_class_ids)))]) for x,y in zip(input_vectors,logit_list)]
 
     def close():
         self.sess.close()
