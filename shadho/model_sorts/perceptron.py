@@ -11,7 +11,9 @@ class Perceptron(object):
     Online reinforcement learning perceptron for mapping models to compute
     classes
     """
-    def __init__(self, input_length, target_levels, model_ids, compute_class_ids, output_levels=None, decay_lambda = 0.9, *args, **kwargs):
+    def __init__(self, input_length, target_levels, model_ids, compute_class_ids, output_levels=None, decay_lambda = 0.9, epsilon=0.1, top_n=1, *args, **kwargs):
+        self.top_n = top_n
+        self.epsilon = epsilon # epsilon for reinforcement learning decision making
         self.pred_queue = [] # list of predictions from scheduler
         self.pred_queue_idx = 0
 
@@ -187,7 +189,7 @@ class Perceptron(object):
         # top 2 models per ccs
         print('input_vectors len = ',len(input_vectors), ' 1st 10 = ', input_vectors[:10])
         print('logit_list len = ', len(logit_list), ' 1st 10 = ', logit_list[:10])
-        return [np.append(self.model_ids[np.where(x[0][0:len(self.model_ids)])[0][0]], self.compute_class_ids[np.argsort(y)[::-1][:2]]) for x,y in zip(input_vectors,logit_list)]
+        return [np.append(self.model_ids[np.where(x[0][0:len(self.model_ids)])[0][0]], self.compute_class_ids[np.argsort(y)[::-1][:self.top_n]]) if (np.random.uniform() > self.epsilon) else np.random.choice(range(len(self.compute_class_ids)))] for x,y in zip(input_vectors,logit_list)]
 
     def close():
         self.sess.close()
