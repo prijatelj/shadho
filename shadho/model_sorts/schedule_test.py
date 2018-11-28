@@ -1,6 +1,19 @@
 import numpy as np
+import argparse
 
 from perceptron import Perceptron
+
+def parse_args():
+    parser = argparse.ArgumentParser(description='Simulation of simplified sorting problem to be solved by online reinforcement learning model.')
+
+    parser.add_argument('-i', '--iterations', default=100, type=int, help='Number of update iterations to simulate for the scheduler being tested.')
+
+    args = parser.parse_args()
+
+    if args.iterations <=0:
+        parser.error('iterations must be an integer > 0.')
+
+    return args
 
 def convert_predictions_to_schedule(model_to_compute_classes):
     """
@@ -55,6 +68,7 @@ def update_scheduler_state(predictions, scheduler_state):
     return scheduler_state
 
 if __name__ == '__main__':
+    args = parse_args()
     # 4 different compute classes (a,b,c,d)
     # 4 different models (w,x,y,z)
     # Every model a compute class it runs best on.
@@ -65,34 +79,39 @@ if __name__ == '__main__':
             'model_1':1,
             'model_2':2,
             'model_3':3,
-            'model_4':4
+            'model_4':4,
+            #'model_5':5
         },
         'cc_2':{
             'model_1':4,
             'model_2':1,
             'model_3':2,
-            'model_4':3
+            'model_4':3,
+            #'model_5':4
         },
         'cc_3':{
             'model_1':3,
             'model_2':4,
             'model_3':1,
-            'model_4':2
+            'model_4':2,
+            #'model_5':3
         },
         'cc_4':{
             'model_1':2,
             'model_2':3,
             'model_3':4,
-            'model_4':1
+            'model_4':1,
+            #'model_5':2
         },
     }
 
     # NOTE could increase runtime on machine w/ more models assigned to them
     models = ['model_1', 'model_2', 'model_3', 'model_4']
+    #models = ['model_1', 'model_2', 'model_3', 'model_4', 'model_5']
     compute_classes = ['cc_1', 'cc_2', 'cc_3', 'cc_4']
 
-    # Init Perceptron: 4 model ids, 4 cc_ids, 3 random uniforms
-    perceptron = Perceptron(11, 4, models, list(compute_classes))
+    # Init Perceptron: # model ids, # cc_ids, 3 random uniforms
+    perceptron = Perceptron(len(models) + len(compute_classes) + 3, len(compute_classes), models, compute_classes)
 
     # TODO initialize first state, must run all models on each compute class
     scheduler_state = {
@@ -138,7 +157,7 @@ if __name__ == '__main__':
     # repetitive update and predict iterations
     #
 
-    for update_itr in range(1,100):
+    for update_itr in range(1,args.iterations):
         samples = []
         runtimes = []
 
