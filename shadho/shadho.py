@@ -129,6 +129,7 @@ class Shadho(object):
         # Store all memory necessary for sorting models dynamically.
         if model_sort == 'perceptron':
             self.init_model_sort = 'assign_all'
+            self.feature_resources = ['cores', 'cores_avg', 'max_concurrent_processes', 'memory', 'virtual_memory']# tmp hardcoded values
             # need to either pass the input and output sizes, or compute later...
             # TODO everytime a model is added or removed from SHADHO, or compute class, need to recreate the dynamic model (will lose previous information unless transfer learning enabled, which makes the model much more difficult).
         else:
@@ -176,6 +177,7 @@ class Shadho(object):
 
         if self.model_sort == 'perceptron':
             # assign all models to all compute classes
+            # only necessary here if reinits during running, by default does not
             self.assign_to_ccs(self.init_model_sort)
 
             # update update_freq to match number of models in batch
@@ -255,9 +257,6 @@ class Shadho(object):
         """
         cc = ComputeClass(name, resource, value, 2 * max_tasks)
         self.ccs[cc.id] = cc
-
-        #if self.model_sorts == 'perceptron':
-        #    self.init_dynamic_model_sort()
 
     def run(self):
         """Search hyperparameter values on remote workers.
@@ -489,7 +488,14 @@ class Shadho(object):
                 self.perceptron.set_normalize_factors(self.backend, self.feature_resources)
 
             # pull the recent models and turn into sample input + runtimes
-            for model in self.backend.models
+            input_vectors = []
+            runtimes = []
+            # extract recent results from all models
+            for model_id in self.backend.models:
+                for idx in range(len(self.ccs)): # history is len(ccs)
+                    resources = self.backend.models[model_id].results[-idx]
+                    input_vectors.append([model_id, resources['compute_class_name']] + [resources['resources_measured'][resrc] for resrc in self.feature_resources])
+                    runtimes.append(results['finish_time'] - results['start_time'])
             input_vectors = []
 
             self.perceptron.update(input_vectors, runtimes)

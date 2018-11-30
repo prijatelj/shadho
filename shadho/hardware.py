@@ -124,5 +124,6 @@ class ComputeClass(object):
         if not isinstance(results, dict):
             results = {'results': results}
         results['compute_class'] = (self.resource, self.value)
+        results['compute_class_name'] = self.name
         return self.model_group.register_result(model_id, result_id, loss,
                                                 results)
