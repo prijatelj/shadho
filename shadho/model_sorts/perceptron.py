@@ -72,9 +72,12 @@ class Perceptron(object):
         #normals_count = len(self.sess.run(self.network_input)) - (len(self.model_ids) + len(self.compute_class_ids))
 
         normalize_factors = np.ones(len(resources))
-        for model_id in shadho_backend.models:
-            for i, resource_id in enumerate(resources):
-                normalize_factors[i] = np.maximum(shadho_backend.models[model_id].results['resources_measured'][resource_id], normalize_factors[i])
+        # find the max resource values across all models for initial run
+        for model_id in shadho_backend.models: # every model
+            for i, resource_id in enumerate(resources): # each resource
+                # iterate through model history, which == len(compute_class_ids)
+                for j in range(len(compute_class_ids)): # history
+                    normalize_factors[i] = np.maximum(shadho_backend.models[model_id].results[-j]['resources_measured'][resource_id], normalize_factors[i])
 
         self.normalize_factors = normalize_factors
 
@@ -206,6 +209,7 @@ class Perceptron(object):
         models = [x[0] for x in input_vectors]
         cc_ids = [x[1] for x in input_vectors]
         input_vectors = self.handle_input(input_vectors)
+        print('FLABBERGASTED!', input_vectors[0])
 
         for input_vector, output_vector, model, cc  in zip(input_vectors, shadho_output, models, cc_ids):
             output_vector = self.handle_output(output_vector)
