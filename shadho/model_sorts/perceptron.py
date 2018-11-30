@@ -32,6 +32,9 @@ class Perceptron(object):
         self.time_averages = {x:None for x in model_ids}
         self.reinit_time_averages = {x:None for x in model_ids}
 
+        # placeholder for normalization factors of the non-1hot features.
+        self.normalize_factors = None
+
         self.network_input, self.softmax_linear = self.inference(input_length, target_levels, output_levels)
         self.total_loss, self.reinforcement_penalties= self.loss(self.softmax_linear, input_length, target_levels)
 
@@ -60,11 +63,49 @@ class Perceptron(object):
     def compute_class_to_onehot(self, compute_class):
         return (self.compute_class_ids == compute_class).astype(int)
 
+    def set_normalize_factors(self, shadho_backend, resources):
+        """
+        Given SHADHO backend and list of resources, get max of each resource
+        feature.
+        """
+        # NOTE set normalize factors after initial run always.
+        #normals_count = len(self.sess.run(self.network_input)) - (len(self.model_ids) + len(self.compute_class_ids))
+
+        normalize_factors = np.ones(len(resources))
+        for model_id in shadho_backend.models:
+            for i, resource_id in resource_list:
+                normalize_factors[i] = np.maximum(shadho_backend.models[model_id].results['resources_measured'][resource_id], normalize_factors[i])
+
+        self.normalize_factors = normalize_factors
+
+    def normalize_input(self, input_vector, normalize_factors=None):
+        """
+        Given 1D array of length non-1hot features, divide those features by
+        their corresponding factor.
+        """
+        input_size = len(self.sess.run(self.network_input))
+        1_hot_size = len(self.model_ids) + len(self.compute_class_ids)
+
+        if normalize_factors is None and self.normalize_factors is not None:
+            normalize_factors = self.normalize_factors
+
+        # assumes that there are more features than the 1 hot vectors
+        if input_size <= 1hot_size:#or 1hot_size != len(self.normalize_factors):
+            return input_vector
+            #elif len(input_vector) != input_size: # should throw error
+            #    return input_vector
+        else:
+            input_vector[(1hot_size+1) :] /= normalize_factors
+
+        return input_vector
+
     def handle_input(self, raw_input_vectors):
         """Handles multiple raw input vectors."""
         input_vectors = []
         for i in raw_input_vectors:
-            input_vectors.append(np.append(np.append(self.model_id_to_onehot(i[0]), self.compute_class_to_onehot(i[1])),  i[2:]).reshape([1, -1]))
+            input_vector = np.append(np.append(self.model_id_to_onehot(i[0]), self.compute_class_to_onehot(i[1])),  i[2:]).reshape([1, -1])
+            if len(input_vector) == len(self.sess.run(self.network_input)):
+                input_vectors.append(self.normalize_input(input_vector))
         return input_vectors
 
     def handle_output(self, raw_output):

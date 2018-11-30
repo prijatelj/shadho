@@ -108,7 +108,8 @@ class Shadho(object):
                  await_pending=False, max_resubmissions=0,
                  update_frequency=10, checkpoint_frequency=50,
                  model_sort=None, init_model_sort=None,
-                 pyrameter_model_sort=None):
+                 pyrameter_model_sort=None,
+                 feature_resources=[]):
         self.config = ShadhoConfig()
         self.cmd = cmd
         self.spec = spec
@@ -123,15 +124,15 @@ class Shadho(object):
         self.checkpoint_frequency = checkpoint_frequency
 
         self.model_sort = model_sort
-        self.init_model_sort = init_model_sort
         self.pyrameter_model_sort = pyrameter_model_sort
 
         # Store all memory necessary for sorting models dynamically.
-        #if model_sort == 'dynamic_perceptron':
-        #    self.model_sorter = init_dynamic_perceptron()
-        #    self.model_sorter = model_sorts.perceptron.Perceptron()
-        #else:
-        #    self.model_sort_memory = None
+        if model_sort == 'perceptron':
+            self.init_model_sort = 'assign_all'
+            # need to either pass the input and output sizes, or compute later...
+            # TODO everytime a model is added or removed from SHADHO, or compute class, need to recreate the dynamic model (will lose previous information unless transfer learning enabled, which makes the model much more difficult).
+        else:
+            self.init_model_sort = init_model_sort
 
         self.ccs = OrderedDict()
 
@@ -153,6 +154,40 @@ class Shadho(object):
         self.config.save_config(self.__tmpdir)
         self.add_input_file(os.path.join(self.__tmpdir, '.shadhorc'))
         self.backend = backend
+
+    def init_dynamic_model_sort(self, input_length=None, output_length=None):
+        """Initializes the dynamic scheduler used by SHADHO if one is in use.
+
+        Prameters
+        ---------
+        input_length : int
+            The length of the input vector to the dynamic scheduler. By default
+            the length is calculated from number of models * number of compute
+            classes.
+        output_length : int
+            The length of the input vector to the dynamic scheduler. By default
+            the length is calculated from number of compute classes.
+        """
+        if input_length is None:
+            # models * ccs + features
+            input_length = len(self.backend.models) + len(self.ccs) + len(self.feature_resources)
+        if output_length is None:
+            output_length = len(self.ccs)
+
+        if self.model_sort == 'perceptron':
+            # assign all models to all compute classes
+            self.assign_to_ccs(self.init_model_sort)
+
+            # update update_freq to match number of models in batch
+            self.update_freq = len(self.backend.models) * len(self.ccs)
+
+            # create the Perceptron()
+            self.perceptron = model_sorts.perceptron.Perceptron(
+                intput_length,
+                output_length,
+                model_ids = list(self.backend.keys()),
+                compute_class_ids = list(self.ccs.keys())
+            ) # TODO add SHADHO args to adjust default params of Perceptron
 
     def __del__(self):
         if hasattr(self, '__tmpdir') and self.__tmpdir is not None:
@@ -221,6 +256,9 @@ class Shadho(object):
         cc = ComputeClass(name, resource, value, 2 * max_tasks)
         self.ccs[cc.id] = cc
 
+        #if self.model_sorts == 'perceptron':
+        #    self.init_dynamic_model_sort()
+
     def run(self):
         """Search hyperparameter values on remote workers.
 
@@ -255,7 +293,10 @@ class Shadho(object):
             self.ccs[cc.id] = cc
 
         # Set up intial model/compute class assignments.
-        self.assign_to_ccs(self.init_model_sort)
+        if self.model_sorts in ['perceptron']:
+            self.init_dynamic_model_sort()
+        else:
+            self.assign_to_ccs(self.init_model_sort)
 
         start = time.time()
         elapsed = 0
@@ -333,7 +374,7 @@ class Shadho(object):
             # Generate enough hyperparameters to fill the queue
             for i in range(n):
                 # Get bookkeeping ids and hyperparameter values
-                if self.model_sort == 'live_perceptron':
+                if self.model_sort == 'perceptron':
                     # run scheduler's specific model to cc assignments.
                     # pop from the pred_queue which is a python list
                     model_id, result_id, param = cc.generate(self.perceptron.next_pred)
@@ -435,13 +476,25 @@ class Shadho(object):
             #        self.ccs[ccs_key].add_model(self.backend[model_id])
                 # NOTE This does not rely on pyrameter handling local scheduling or history! More like the default version.
 
-           # NOTE live_perceptron will not reassign models to ccs ever because it
-           # explicitly controls what models are run where. This time is used for
-           # updating the scheduler and generating the new predictions
-           # TODO
-           self.perceptron.update()
-           self.perceptron.predict()
-           # now go an run the new predictions and return eventually with runtimes
+            # NOTE (live_)perceptron will not reassign models to ccs ever because
+            # it explicitly controls what models are run where. This time is
+            # used for  updating the scheduler and generating the new predictions
+            # NOTE update_freq needs to be set to len(compute class) * len(models)
+            # to sync the update_freq with models predicted.
+
+            # TODO
+
+            # if initial run of Perceptron, set normals: defaults to np.ones()
+            if self.normalize_factors is None:
+                self.perceptron.set_normalize_factors(self.backend, self.feature_resources)
+
+            # pull the recent models and turn into sample input + runtimes
+            for model in self.backend.models
+            input_vectors = []
+
+            self.perceptron.update(input_vectors, runtimes)
+            self.perceptron.predict(input_vectors) # updates pred_queue
+            # now go an run the new predictions and return eventually with runtimes
 
         elif model_sort=='assign_all':
             # NOTE this is an expensive operation when repetively called & doing
