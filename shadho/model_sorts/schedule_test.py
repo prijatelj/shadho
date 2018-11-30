@@ -203,13 +203,14 @@ if __name__ == '__main__':
         all_runtimes += runtimes
 
         # Torture the poor scheduler by changing the rules halfway through
+        #if update_itr == 200:
         if update_itr % 200 == 0:
             runtime_map = runtime_map2 if map_swap else runtime_map1
             map_swap = map_swap ^ True #flip switch
 
         # Re-init the perceptron every so often to make it easier to adapt to changing environment
-        if update_itr % 300 == 0:
-            perceptron.reinit()
+        #if update_itr % 300 == 0:
+        #    perceptron.reinit()
 
         # print out most recent 10 samples and their associated predictions
         # for s in range(10):

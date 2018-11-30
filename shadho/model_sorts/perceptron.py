@@ -23,7 +23,9 @@ class Perceptron(object):
 
         self.decay_lambda = decay_lambda # global decay factor for all moving averages
         #self.reinit_decay_lambda = decay_lambda * . if reinit_decay_lambda is None else reinit_decay_lambda
-        self.reinit_decay_lambda = 0.74
+        #self.reinit_decay_lambda = 0.74
+        self.reinit_decay_lambda = 0.84
+        self.reinit_counter = 0
 
 
         self.param_averages = {x:None for x in model_ids}
@@ -174,11 +176,15 @@ class Perceptron(object):
                 self.time_averages[model] = output_vector * (1-self.decay_lambda) + self.time_averages[model] * self.decay_lambda
 
                 self.reinit_time_averages[model] = output_vector * (1-self.reinit_decay_lambda) + self.time_averages[model] * self.reinit_decay_lambda
+                self.reinit_counter += 1
 
                 # TODO reinit after time to converge, recent loss is significantly worse recently
-                #if self.sess.run(self.global_step) % 1000 == 0 \
-                #     and np.mean(list(self.reinit_time_averages.values())) > 1.5 * np.mean(list(self.time_averages.values())):
-                #    self.reinit()
+                #if self.sess.run(self.global_step) > 1000 == 0 \
+                if self.reinit_counter > 2500 \
+                     and np.mean(list(self.reinit_time_averages.values())) > 1 * np.mean(list(self.time_averages.values())):
+                    # Note, only checks every 1000, may want a counter to compare to instead.
+                    self.reinit()
+                    self.reinit_counter = 0
 
             rl_vector = (np.sign((self.time_averages[model] - output_vector)/self.time_averages[model] - 0.005) * self.compute_class_to_onehot(cc).reshape(1,-1))
 
