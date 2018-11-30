@@ -3,6 +3,7 @@ Online reinforcement learning perceptron using mini-batching
 """
 import numpy as np
 import tensorflow as tf
+import matplotlib.pyplot as plt
 
 from IPython.core.debugger import Tracer
 
@@ -11,7 +12,7 @@ class Perceptron(object):
     Online reinforcement learning perceptron for mapping models to compute
     classes
     """
-    def __init__(self, input_length, target_levels, model_ids, compute_class_ids, output_levels=None, decay_lambda = 0.9, epsilon=0.1, top_n=1, *args, **kwargs):
+    def __init__(self, input_length, target_levels, model_ids, compute_class_ids, output_levels=None, decay_lambda = 0.85, epsilon=0.1, top_n=1, *args, **kwargs):
         self.top_n = top_n
         self.epsilon = epsilon # epsilon for reinforcement learning decision making
         self.pred_queue = [] # list of predictions from scheduler
@@ -28,11 +29,11 @@ class Perceptron(object):
         self.total_loss, self.reinforcement_penalties= self.loss(self.softmax_linear, input_length, target_levels)
 
         self.global_step = tf.Variable(0, trainable=False, name='global_step')
-        self.train_op = self.train(self.total_loss, self.global_step)
-        init_op = tf.group(tf.global_variables_initializer(), tf.local_variables_initializer())
+        self.train_op, self.grads = self.train(self.total_loss, self.global_step)
+        self.init_op = tf.group(tf.global_variables_initializer(), tf.local_variables_initializer())
 
         self.sess = tf.Session()
-        self.sess.run(init_op)
+        self.sess.run(self.init_op)
 
     @property
     def next_pred(self):
@@ -61,7 +62,6 @@ class Perceptron(object):
 
     def handle_output(self, raw_output):
         """Handles single raw_output value."""
-        # return np.asarray(raw_output, dtype=float).reshape([1,1])
         return np.asarray(raw_output, dtype=float)
 
     def inference(self, input_length, target_levels, output_levels=None):
@@ -76,25 +76,26 @@ class Perceptron(object):
         network_input = tf.placeholder(tf.float32, shape=[1, input_length])
 
         with tf.variable_scope('hidden1') as scope:
-            weights = tf.get_variable('hidden1_weights',shape=[input_length, 10], initializer=tf.truncated_normal_initializer(stddev=0.04))
-            weight_decay = tf.multiply(tf.nn.l2_loss(weights), 0.004, name='weight_loss')
-            tf.add_to_collection('losses', weight_decay)
-            biases = tf.get_variable('hidden1_biases', shape=[10],initializer=tf.constant_initializer(0.1))
-            hidden1 = tf.nn.relu(tf.matmul(network_input, weights) + biases, name=scope.name)
+            weights = tf.get_variable('hidden1_weights',shape=[input_length, output_levels], initializer=tf.truncated_normal_initializer(stddev=0.5))
+            biases = tf.get_variable('hidden1_biases', shape=[output_levels],initializer=tf.constant_initializer(0.1))
+            hidden1 = tf.nn.sigmoid(tf.matmul(network_input, weights) + biases, name=scope.name)
 
-        with tf.variable_scope('hidden2') as scope:
-            weights = tf.get_variable('hidden2_weights',shape=[10,10], initializer=tf.truncated_normal_initializer(stddev=0.04))
-            weight_decay = tf.multiply(tf.nn.l2_loss(weights), 0.004, name='weight_loss')
-            tf.add_to_collection('losses', weight_decay)
-            biases = tf.get_variable('hidden2_biases', shape=[10],initializer=tf.constant_initializer(0.1))
-            hidden2 = tf.nn.relu(tf.matmul(hidden1, weights) + biases, name=scope.name)
+        # Deeper network components currently removed; further testing and alteration of loss probably required to use them
+        # Also removed all of the L2 loss terms becuase they were screwing with training and I didn't feel like normalizing the loss to fix that
 
-        with tf.variable_scope('softmax_linear') as scope:
-            weights = tf.get_variable('softmax_weights',shape=[10, output_levels], initializer=tf.truncated_normal_initializer(stddev=1.0))
-            biases = tf.get_variable('biases', shape=[target_levels], initializer=tf.constant_initializer(0.0))
-            softmax_linear = tf.add(tf.matmul(hidden2, weights), biases, name=scope.name)
+        # with tf.variable_scope('hidden2') as scope:
+        #     weights = tf.get_variable('hidden2_weights',shape=[10,output_levels], initializer=tf.truncated_normal_initializer(stddev=0.5))
+        #     # weight_decay = tf.multiply(tf.nn.l2_loss(weights), 0.004, name='weight_loss')
+        #     # tf.add_to_collection('losses', weight_decay)
+        #     biases = tf.get_variable('hidden2_biases', shape=[output_levels],initializer=tf.constant_initializer(0.1))
+        #     hidden2 = tf.nn.sigmoid(tf.matmul(hidden1, weights) + biases, name=scope.name)
 
-        return network_input, softmax_linear
+        # with tf.variable_scope('softmax_linear') as scope:
+        #     weights = tf.get_variable('softmax_weights',shape=[10, output_levels], initializer=tf.truncated_normal_initializer(stddev=1.0))
+        #     biases = tf.get_variable('biases', shape=[target_levels], initializer=tf.constant_initializer(0.0))
+        #     softmax_linear = tf.add(tf.matmul(hidden2, weights), biases, name=scope.name)
+
+        return network_input, hidden1
 
     def loss(self, logits, input_length, target_levels):
         """
@@ -107,15 +108,14 @@ class Perceptron(object):
             Loss tensor of type float.
         """
         reinforcement_penalties = tf.placeholder(tf.float32, shape=[1, target_levels])
-        # Calculate the average reinforcement loss across the batch.
-        #reinforcement_loss = tf.reduce_mean(tf.matmul(reinforcement_penalties, logits), name='cross_entropy')
-        reinforcement_loss = tf.reduce_mean(tf.matmul(reinforcement_penalties, tf.exp(logits),transpose_a=True), name='rl_loss')
+        # Calculate the reinforcement loss.
+        reinforcement_loss = tf.squeeze(tf.matmul(reinforcement_penalties, -tf.log(logits + (0.001)),transpose_b=True,name='rl_product'), name='rl_loss')
         tf.add_to_collection('losses', reinforcement_loss)
 
         # The total loss is defined as the reinforcement loss plus all of the weight decay terms (L2 loss).
         return tf.add_n(tf.get_collection('losses'), name='total_loss'), reinforcement_penalties
 
-    def train(self, total_loss, global_step, initial_learning_rate=0.1, num_epochs_per_decay=100, learning_rate_decay_factor=0.9, moving_average_decay=0.99):
+    def train(self, total_loss, global_step, initial_learning_rate=0.8, num_epochs_per_decay=160, learning_rate_decay_factor=1.0, moving_average_decay=0.99):
         """
         :param initial_learning_rate: Learning rate of perceptron
         :param num_epochs_per_decay: number of epochs to pass before decaying
@@ -126,8 +126,10 @@ class Perceptron(object):
         """
 
         # Decay the learning rate exponentially based on the number of steps.
-        lr = tf.train.exponential_decay(initial_learning_rate, global_step, num_epochs_per_decay, learning_rate_decay_factor, staircase=True)
-        tf.summary.scalar('learning_rate', lr)
+        # lr = tf.train.exponential_decay(initial_learning_rate, global_step, num_epochs_per_decay, learning_rate_decay_factor, staircase=True)
+
+        # Use a fixed learning rate
+        lr = initial_learning_rate
 
         # Compute gradients.
         with tf.control_dependencies([total_loss]):
@@ -141,8 +143,9 @@ class Perceptron(object):
         #variable_averages = tf.train.ExponentialMovingAverage(moving_average_decay, global_step)
         #with tf.control_dependencies([apply_gradient_op]):
         #    variables_averages_op = variable_averages.apply(tf.trainable_variables())
-        return apply_gradient_op
         #return variables_averages_op
+
+        return apply_gradient_op, grads
 
     def update(self, input_vectors, shadho_output):
         """
@@ -165,9 +168,9 @@ class Perceptron(object):
                 self.param_averages[model] = input_vector * (1-self.decay_lambda) + self.param_averages[model] * self.decay_lambda
                 self.time_averages[model] = output_vector * (1-self.decay_lambda) + self.time_averages[model] * self.decay_lambda
 
-            rl_vector = ((output_vector - self.time_averages[model])  * self.compute_class_to_onehot(cc)).reshape(1,-1)
+            rl_vector = (np.sign((self.time_averages[model] - output_vector)/self.time_averages[model] - 0.005) * self.compute_class_to_onehot(cc).reshape(1,-1))
 
-            self.sess.run(self.train_op, feed_dict={self.reinforcement_penalties: rl_vector, self.network_input: input_vector})
+            self.sess.run(self.train_op, feed_dict={self.reinforcement_penalties: rl_vector, self.network_input: self.param_averages[model]})
             print(f"rl_vector: {rl_vector} | post_losses: {self.sess.run(tf.get_collection('losses'), feed_dict={self.reinforcement_penalties: rl_vector, self.network_input: input_vector})}")
 
     def predict(self, input_vectors):
@@ -191,6 +194,10 @@ class Perceptron(object):
         print('input_vectors len = ',len(input_vectors), ' 1st 10 = ', input_vectors[:10])
         print('logit_list len = ', len(logit_list), ' 1st 10 = ', logit_list[:10])
         return [np.append(self.model_ids[np.where(x[0][0:len(self.model_ids)])[0][0]], self.compute_class_ids[np.argsort(y)[::-1][:self.top_n] if (np.random.uniform() > self.epsilon) else np.random.choice(range(len(self.compute_class_ids)))]) for x,y in zip(input_vectors,logit_list)]
+
+    def reinit(self):
+        # Re-initialize the learner. Potentially a good idea to do periodically, as it has a bit of trouble climbing out of deep local minima
+        self.sess.run(self.init_op)
 
     def close():
         self.sess.close()

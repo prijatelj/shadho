@@ -1,6 +1,9 @@
-import numpy as np
+﻿import numpy as np
 import argparse
+import matplotlib.pyplot as plt
+import tensorflow as tf
 
+from IPython.core.debugger import Tracer
 from perceptron import Perceptron
 
 def parse_args():
@@ -134,11 +137,11 @@ if __name__ == '__main__':
     predictions.append(perceptron.predict(samples))
 
     # print out most recent 10 samples and their associated predictions
-    for s in range(10):
-        if (10-s) < len(predictions[0][1]):
-            print(-(10-s), 'sample and scheduler prediction: ')
-            print(samples[-(10-s)])
-            print(predictions[0][1][-(10-s)])
+    # for s in range(10):
+    #     if (10-s) < len(predictions[0][1]):
+    #         print(-(10-s), 'sample and scheduler prediction: ')
+    #         print(samples[-(10-s)])
+    #         print(predictions[0][1][-(10-s)])
 
     #"""
     all_samples += samples
@@ -148,12 +151,18 @@ if __name__ == '__main__':
     # repetitive update and predict iterations
     #
 
+    avg_times = []
+    system_times = []
+
     for update_itr in range(1,args.iterations):
         # generate samples and their runtimes
         samples = create_samples(scheduler_state, predictions[update_itr-1][1])
         runtimes = get_runtimes(samples, runtime_map)
 
-        # update and predict
+        # Track runtimes for plotting purposes
+        avg_times.append(np.mean(runtimes))
+        system_times.append(np.mean(list(perceptron.time_averages.values())))
+
         perceptron.update(samples, runtimes)
         predictions.append(perceptron.predict(samples))
 
@@ -161,10 +170,47 @@ if __name__ == '__main__':
         all_samples += samples
         all_runtimes += runtimes
 
+        # Torture the poor scheduler by changing the rules halfway through
+        if update_itr == 200:
+            runtime_map= {
+                'cc_3':{
+                    'model_1':1,
+                    'model_2':2,
+                    'model_3':3,
+                    'model_4':4,
+                    #'model_5':5
+                },
+                'cc_4':{
+                    'model_1':4,
+                    'model_2':1,
+                    'model_3':2,
+                    'model_4':3,
+                    #'model_5':4
+                },
+                'cc_1':{
+                    'model_1':3,
+                    'model_2':4,
+                    'model_3':1,
+                    'model_4':2,
+                    #'model_5':3
+                },
+                'cc_2':{
+                    'model_1':2,
+                    'model_2':3,
+                    'model_3':4,
+                    'model_4':1,
+                    #'model_5':2
+                },
+            }
+
+        # Re-init the perceptron every so often to make it easier to adapt to changing environment
+        if update_itr % 300 == 0:
+            perceptron.reinit()
+
         # print out most recent 10 samples and their associated predictions
-        for s in range(10):
-            if (10-s) < len(predictions[update_itr][1]):
-                print(-(10-s), 'sample and scheduler prediction: ')
-                print(samples[-(10-s)])
-                print(predictions[update_itr][1][-(10-s)])
+        # for s in range(10):
+        #     if (10-s) < len(predictions[update_itr][1]):
+        #         print(-(10-s), 'sample and scheduler prediction: ')
+        #         print(samples[-(10-s)])
+        #         print(predictions[update_itr][1][-(10-s)])
     #"""
