@@ -75,7 +75,7 @@ if __name__ == '__main__':
     # Every model a compute class it runs best on.
     # 1-to-1 ideal is a:w, b:x, c:y, d:z.
     # However, models are able to run on multiple compute classes.
-    runtime_map= {
+    runtime_map1= {
         'cc_1':{
             'model_1':1,
             'model_2':2,
@@ -105,6 +105,38 @@ if __name__ == '__main__':
             #'model_5':2
         },
     }
+    runtime_map2= {
+        'cc_3':{
+            'model_1':1,
+            'model_2':2,
+            'model_3':3,
+            'model_4':4,
+            #'model_5':5
+        },
+        'cc_4':{
+            'model_1':4,
+            'model_2':1,
+            'model_3':2,
+            'model_4':3,
+            #'model_5':4
+        },
+        'cc_1':{
+            'model_1':3,
+            'model_2':4,
+            'model_3':1,
+            'model_4':2,
+            #'model_5':3
+        },
+        'cc_2':{
+            'model_1':2,
+            'model_2':3,
+            'model_3':4,
+            'model_4':1,
+            #'model_5':2
+        },
+    }
+    runtime_map = runtime_map1
+    map_swap = True
 
     # NOTE could increase runtime on machine w/ more models assigned to them
     models = ['model_1', 'model_2', 'model_3', 'model_4']
@@ -154,7 +186,7 @@ if __name__ == '__main__':
     avg_times = []
     system_times = []
 
-    for update_itr in range(1,args.iterations):
+    for update_itr in range(1, args.iterations):
         # generate samples and their runtimes
         samples = create_samples(scheduler_state, predictions[update_itr-1][1])
         runtimes = get_runtimes(samples, runtime_map)
@@ -171,37 +203,9 @@ if __name__ == '__main__':
         all_runtimes += runtimes
 
         # Torture the poor scheduler by changing the rules halfway through
-        if update_itr == 200:
-            runtime_map= {
-                'cc_3':{
-                    'model_1':1,
-                    'model_2':2,
-                    'model_3':3,
-                    'model_4':4,
-                    #'model_5':5
-                },
-                'cc_4':{
-                    'model_1':4,
-                    'model_2':1,
-                    'model_3':2,
-                    'model_4':3,
-                    #'model_5':4
-                },
-                'cc_1':{
-                    'model_1':3,
-                    'model_2':4,
-                    'model_3':1,
-                    'model_4':2,
-                    #'model_5':3
-                },
-                'cc_2':{
-                    'model_1':2,
-                    'model_2':3,
-                    'model_3':4,
-                    'model_4':1,
-                    #'model_5':2
-                },
-            }
+        if update_itr % 200 == 0:
+            runtime_map = runtime_map2 if map_swap else runtime_map1
+            map_swap = map_swap ^ True #flip switch
 
         # Re-init the perceptron every so often to make it easier to adapt to changing environment
         if update_itr % 300 == 0:

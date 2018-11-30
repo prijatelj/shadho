@@ -12,7 +12,7 @@ class Perceptron(object):
     Online reinforcement learning perceptron for mapping models to compute
     classes
     """
-    def __init__(self, input_length, target_levels, model_ids, compute_class_ids, output_levels=None, decay_lambda = 0.85, epsilon=0.1, top_n=1, *args, **kwargs):
+    def __init__(self, input_length, target_levels, model_ids, compute_class_ids, output_levels=None, decay_lambda=0.85, reinit_decay_lambda=None, epsilon=0.1, top_n=1, *args, **kwargs):
         self.top_n = top_n
         self.epsilon = epsilon # epsilon for reinforcement learning decision making
         self.pred_queue = [] # list of predictions from scheduler
@@ -22,8 +22,13 @@ class Perceptron(object):
         self.compute_class_ids = np.array(compute_class_ids)
 
         self.decay_lambda = decay_lambda # global decay factor for all moving averages
+        #self.reinit_decay_lambda = decay_lambda * . if reinit_decay_lambda is None else reinit_decay_lambda
+        self.reinit_decay_lambda = 0.74
+
+
         self.param_averages = {x:None for x in model_ids}
         self.time_averages = {x:None for x in model_ids}
+        self.reinit_time_averages = {x:None for x in model_ids}
 
         self.network_input, self.softmax_linear = self.inference(input_length, target_levels, output_levels)
         self.total_loss, self.reinforcement_penalties= self.loss(self.softmax_linear, input_length, target_levels)
@@ -167,6 +172,13 @@ class Perceptron(object):
             else:
                 self.param_averages[model] = input_vector * (1-self.decay_lambda) + self.param_averages[model] * self.decay_lambda
                 self.time_averages[model] = output_vector * (1-self.decay_lambda) + self.time_averages[model] * self.decay_lambda
+
+                self.reinit_time_averages[model] = output_vector * (1-self.reinit_decay_lambda) + self.time_averages[model] * self.reinit_decay_lambda
+
+                # TODO reinit after time to converge, recent loss is significantly worse recently
+                #if self.sess.run(self.global_step) % 1000 == 0 \
+                #     and np.mean(list(self.reinit_time_averages.values())) > 1.5 * np.mean(list(self.time_averages.values())):
+                #    self.reinit()
 
             rl_vector = (np.sign((self.time_averages[model] - output_vector)/self.time_averages[model] - 0.005) * self.compute_class_to_onehot(cc).reshape(1,-1))
 
