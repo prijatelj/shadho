@@ -125,5 +125,8 @@ class ComputeClass(object):
             results = {'results': results}
         results['compute_class'] = (self.resource, self.value)
         results['compute_class_name'] = self.name
+        # TODO somewhere in this stream of register_results, the previous_sample
+        # that led to this model being predicted needs added if perceptron
+        # shadho.model_sort was used. Otherwise default to None value.
         return self.model_group.register_result(model_id, result_id, loss,
                                                 results)
