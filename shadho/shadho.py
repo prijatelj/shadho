@@ -494,13 +494,17 @@ class Shadho(object):
             # pull the recent models and turn into sample input + runtimes
             input_vectors = []
             runtimes = []
+            #missing_input_vectors TODO if a model failed, ignore and predict from avg.
             # extract recent results from all models
             for model_id in self.backend.models:
                 for idx in range(len(self.ccs)): # history is len(ccs)
                     resources = self.backend.models[model_id].results[-idx]
-                    input_vectors.append([model_id, resources['compute_class_name']] + [resources['resources_measured'][resrc] for resrc in self.feature_resources])
-                    runtimes.append(results['finish_time'] - results['start_time'])
-            input_vectors = []
+                    if resources.loss is None or resources.results is None:
+                        #missing_input_vectores.append([model_id, cc_id, None])
+                        continue
+
+                    input_vectors.append([model_id, resources.results['compute_class'][name]] + [resources.results['resources_measured'][resrc] for resrc in self.feature_resources])
+                    runtimes.append(resources.results['finish_time'] - resources.results['start_time'])
 
             self.perceptron.update(input_vectors, runtimes)
             self.perceptron.predict(input_vectors) # updates pred_queue
