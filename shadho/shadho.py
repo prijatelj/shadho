@@ -336,6 +336,10 @@ class Shadho(object):
             if hasattr(self, '__tmpdir') and self.__tmpdir is not None:
                 os.rmdir(self.__tmpdir)
 
+        # close the perceptron if used:
+        if self.model_sort == 'perceptron':
+            self.perceptron.close()
+
         # Save the results and print the optimal set of parameters to  screen
         self.backend.save()
         opt = self.backend.optimal(mode='best')
