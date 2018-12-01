@@ -5,7 +5,7 @@ import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
-from IPython.core.debugger import Tracer
+#from IPython.core.debugger import Tracer
 
 class Perceptron(object):
     """
@@ -24,8 +24,8 @@ class Perceptron(object):
 
         self.decay_lambda = decay_lambda # global decay factor for all moving averages
         #self.reinit_decay_lambda = decay_lambda * . if reinit_decay_lambda is None else reinit_decay_lambda
-        #self.reinit_decay_lambda = 0.74
-        self.reinit_decay_lambda = 0.84
+        self.reinit_decay_lambda = 0.74
+        #self.reinit_decay_lambda = 0.84
         self.reinit_counter = 0
         self.reinit_strikes = 0
 

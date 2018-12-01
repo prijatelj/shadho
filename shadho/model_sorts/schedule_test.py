@@ -3,7 +3,7 @@ import argparse
 import matplotlib.pyplot as plt
 import tensorflow as tf
 
-from IPython.core.debugger import Tracer
+#from IPython.core.debugger import Tracer
 from perceptron import Perceptron
 
 def parse_args():
