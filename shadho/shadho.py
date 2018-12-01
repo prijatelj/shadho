@@ -292,7 +292,7 @@ class Shadho(object):
             self.ccs[cc.id] = cc
 
         # Set up intial model/compute class assignments.
-        if self.model_sorts in ['perceptron']:
+        if self.model_sort in ['perceptron']:
             self.init_dynamic_model_sort()
         else:
             self.assign_to_ccs(self.init_model_sort)
