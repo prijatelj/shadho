@@ -179,10 +179,7 @@ if __name__ == '__main__':
     all_samples += samples
     all_runtimes += runtimes
 
-    #
     # repetitive update and predict iterations
-    #
-
     avg_times = []
     system_times = []
 
@@ -203,7 +200,7 @@ if __name__ == '__main__':
         all_runtimes += runtimes
 
         # Torture the poor scheduler by changing the rules halfway through
-        #if update_itr == 200:
+        #if update_itr % 200 == 0:
         if update_itr % 200 == 0:
             runtime_map = runtime_map2 if map_swap else runtime_map1
             map_swap = map_swap ^ True #flip switch

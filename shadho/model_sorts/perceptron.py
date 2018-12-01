@@ -13,6 +13,7 @@ class Perceptron(object):
     classes
     """
     def __init__(self, input_length, target_levels, model_ids, compute_class_ids, output_levels=None, decay_lambda=0.85, reinit_decay_lambda=None, epsilon=0.1, top_n=1, *args, **kwargs):
+        self.input_length = input_length
         self.top_n = top_n
         self.epsilon = epsilon # epsilon for reinforcement learning decision making
         self.pred_queue = [] # list of predictions from scheduler
@@ -26,6 +27,7 @@ class Perceptron(object):
         #self.reinit_decay_lambda = 0.74
         self.reinit_decay_lambda = 0.84
         self.reinit_counter = 0
+        self.reinit_strikes = 0
 
 
         self.param_averages = {x:None for x in model_ids}
@@ -86,19 +88,18 @@ class Perceptron(object):
         Given 1D array of length non-1hot features, divide those features by
         their corresponding factor.
         """
-        input_size = len(self.sess.run(self.network_input))
         one_hot_size = len(self.model_ids) + len(self.compute_class_ids)
 
         if normalize_factors is None and self.normalize_factors is not None:
             normalize_factors = self.normalize_factors
 
         # assumes that there are more features than the 1 hot vectors
-        if input_size <= one_hot_size:#or one_hot_size != len(self.normalize_factors):
+        if self.input_length <= one_hot_size:
             return input_vector
-            #elif len(input_vector) != input_size: # should throw error
+            #elif len(input_vector) != self.input_length: # should throw error
             #    return input_vector
         else:
-            input_vector[one_hot_size:] /= normalize_factors
+            input_vector[one_hot_size:] = input_vector[one_hot_size:] / normalize_factors
 
         return input_vector
 
@@ -107,8 +108,7 @@ class Perceptron(object):
         input_vectors = []
         for i in raw_input_vectors:
             input_vector = np.append(np.append(self.model_id_to_onehot(i[0]), self.compute_class_to_onehot(i[1])),  i[2:]).reshape([1, -1])
-            if len(input_vector) == len(self.sess.run(self.network_input)):
-                input_vectors.append(self.normalize_input(input_vector))
+            input_vectors.append(self.normalize_input(input_vector))
             # TODO possibly add custom error for caller to handle.
         return input_vectors
 
@@ -209,7 +209,6 @@ class Perceptron(object):
         models = [x[0] for x in input_vectors]
         cc_ids = [x[1] for x in input_vectors]
         input_vectors = self.handle_input(input_vectors)
-        print('FLABBERGASTED!', input_vectors[0])
 
         for input_vector, output_vector, model, cc  in zip(input_vectors, shadho_output, models, cc_ids):
             output_vector = self.handle_output(output_vector)
@@ -228,9 +227,15 @@ class Perceptron(object):
                 #if self.sess.run(self.global_step) > 1000 == 0 \
                 if self.reinit_counter > 2500 \
                      and np.mean(list(self.reinit_time_averages.values())) > 1 * np.mean(list(self.time_averages.values())):
-                    # Note, only checks every 1000, may want a counter to compare to instead.
-                    self.reinit()
-                    self.reinit_counter = 0
+                    if self.reinit_strikes > 5:
+                        self.reinit()
+                        self.reinit_counter = 0
+                        self.reinit_strikes = 0
+                    else:
+                        self.reinit_strikes += 1
+                elif self.reinit_strikes > 0:
+                    self.reinit_strikes -= 1
+
 
             rl_vector = (np.sign((self.time_averages[model] - output_vector)/self.time_averages[model] - 0.005) * self.compute_class_to_onehot(cc).reshape(1,-1))
 
