@@ -503,7 +503,7 @@ class Shadho(object):
                         #missing_input_vectores.append([model_id, cc_id, None])
                         continue
 
-                    input_vectors.append([model_id, resources.results['compute_class'][name]] + [resources.results['resources_measured'][resrc] for resrc in self.feature_resources])
+                    input_vectors.append([model_id, resources.results['compute_class']['name']] + [resources.results['resources_measured'][resrc] for resrc in self.feature_resources])
                     runtimes.append(resources.results['finish_time'] - resources.results['start_time'])
 
             self.perceptron.update(input_vectors, runtimes)
