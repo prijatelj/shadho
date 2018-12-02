@@ -402,8 +402,8 @@ class Shadho(object):
                     stop = False  # Ensure that the search continues
             cc.current_tasks = cc.max_tasks  # Update to show full queue
 
-            if self.initial_generation and self.model_sort == 'perceptron':
-                self.initial_generation = False
+        if self.initial_generation and self.model_sort == 'perceptron':
+            self.initial_generation = False
 
     def assign_to_ccs(self, override_model_sort=None):
         """Assign trees to compute classes.
