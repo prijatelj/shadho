@@ -59,6 +59,7 @@ class Perceptron(object):
         """Returns current value and moves pointer to next index."""
         pred = self.pred_queue[compute_class_id]['queue'][self.pred_queue[compute_class_id]['idx']] if self.pred_queue[compute_class_id]['queue'] else None
 
+        print('next_pred queue', self.pred_queue[compute_class_id]['queue'])
         if self.pred_queue[compute_class_id]['idx'] >= len(self.pred_queue[compute_class_id]['queue']):
             self.pred_queue[compute_class_id]['idx'] = 0
             if not self.pred_queue[compute_class_id]['looped']:
