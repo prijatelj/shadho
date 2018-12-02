@@ -128,6 +128,7 @@ class Shadho(object):
 
         # Store all memory necessary for sorting models dynamically.
         if model_sort == 'perceptron':
+            print('SHADHO is using the perceptron model sort method.')
             self.init_model_sort = 'assign_all'
             self.feature_resources = ['cores', 'cores_avg', 'max_concurrent_processes', 'memory', 'virtual_memory']# tmp hardcoded values
             # need to either pass the input and output sizes, or compute later...
