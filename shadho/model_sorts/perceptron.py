@@ -132,6 +132,7 @@ class Perceptron(object):
         for i in raw_input_vectors:
             if i[1] is None: # if failed results exists, run average prediction.
                 input_vectors.append(self.param_averages[i[0]])
+                print('self.param_averages[i[0]]', self.param_averages[i[0]])
             else:
                 input_vector = np.append(np.append(self.model_id_to_onehot(i[0]), self.compute_class_to_onehot(i[1])),  i[2:]).reshape([1, -1])
                 input_vectors.append(self.normalize_input(input_vector))

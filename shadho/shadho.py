@@ -402,9 +402,6 @@ class Shadho(object):
                     stop = False  # Ensure that the search continues
             cc.current_tasks = cc.max_tasks  # Update to show full queue
 
-        if self.initial_generation and self.model_sort == 'perceptron':
-            self.initial_generation = False
-
     def assign_to_ccs(self, override_model_sort=None):
         """Assign trees to compute classes.
 
@@ -506,7 +503,7 @@ class Shadho(object):
                 for idx in range(len(self.ccs)): # history is len(ccs)
                     resources = self.backend.models[model_id].results[-idx]
                     if resources.loss is None or resources.results is None:
-                        missing_input_vectores.append([model_id, None])
+                        missing_input_vectors.append([model_id, None])
                     else:
                         input_vectors.append([model_id, resources.results['compute_class']['name']] + [resources.results['resources_measured'][resrc] for resrc in self.feature_resources])
                         runtimes.append(resources.results['finish_time'] - resources.results['start_time'])
@@ -514,8 +511,21 @@ class Shadho(object):
             if input_vectors:
                 self.perceptron.update(input_vectors, runtimes)
                 self.perceptron.predict(input_vectors) # updates pred_queue
-            if missing_input_vectors:
+                no_input = False
+                if self.initial_generation:
+                    self.initial_generation = False
+            else:
+                no_input = True
+            if missing_input_vectors and None not in (self.perceptron.param_averages.values()):
                 self.perceptron.predict(missing_input_vectors) # updates pred_queue
+            #elif no_input:
+            #    if self.initial_generation: # if never updated, assign all again.
+            #        for key in list(self.ccs.keys()):
+            #            self.ccs[key].clear()
+            #            for mid in self.backend.model_ids:
+            #                self.ccs[key].add_model(self.backend[mid]) # for init assign
+            # NOTE no need to reasign in any case.
+
             # now go an run the new predictions and return eventually with runtimes
 
         elif model_sort=='assign_all':
