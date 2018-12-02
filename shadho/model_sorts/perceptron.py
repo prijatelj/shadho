@@ -297,21 +297,24 @@ class Perceptron(object):
         for input_vec in input_vectors:
             print(input_vec)
 
-        logit_list = []
-        if self.param_averages[model_id] is not None:
-            # use the averages if exists
-            models = [x[0] for x in input_vectors]
-            for model_id in models:
-                    logit_list.append(self.sess.run(self.softmax_linear, feed_dict = {self.network_input : self.param_averages[model_id]}))
-        else:
-            # use the actual sample
-            input_vectors = self.handle_input(input_vectors)
-            print('predict handled input vec:')
-            for input_vec in input_vectors:
-                print(input_vec)
+        models = [x[0] for x in input_vectors]
 
-            for input_vector in input_vectors:
-                logit_list.append(self.sess.run(self.softmax_linear, feed_dict = {self.network_input : input_vector}))
+        input_vectors = self.handle_input(input_vectors)
+        print('predict handled input vec:')
+        for input_vec in input_vectors:
+            print(input_vec)
+
+        logit_list = []
+
+        # loop through input provided and make predictions
+        for i, model_id in enumerate(models):
+            if self.param_averages[model_id] is not None:
+                # use the averages if exists
+                    logit_list.append(self.sess.run(self.softmax_linear, feed_dict = {self.network_input : self.param_averages[model_id]}))
+            else:
+                # use the actual sample
+                logit_list.append(self.sess.run(self.softmax_linear, feed_dict = {self.network_input : input_vectors[i]}))
+
         # outputs log probabilities, convert to non-log probabilities
         logit_list = [np.e ** logits / np.sum(np.e**logits) for logits in logit_list]
         logit_list = [np.squeeze(logits) for logits in logit_list]
