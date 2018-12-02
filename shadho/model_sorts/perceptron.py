@@ -138,7 +138,7 @@ class Perceptron(object):
         input_vector = input_vector.astype(float)
         input_vector[:, one_hot_size:] = input_vector[:, one_hot_size:] / normalize_factors
 
-        return input_vector.
+        return input_vector
 
     def handle_input(self, raw_input_vectors):
         """Handles multiple raw input vectors."""
