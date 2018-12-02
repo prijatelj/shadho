@@ -494,20 +494,25 @@ class Shadho(object):
             # pull the recent models and turn into sample input + runtimes
             input_vectors = []
             runtimes = []
-            #missing_input_vectors TODO if a model failed, ignore and predict from avg.
+
+            # if a model failed, ignore and predict from avg.
+            missing_input_vectors = []
+
             # extract recent results from all models
             for model_id in self.backend.models:
                 for idx in range(len(self.ccs)): # history is len(ccs)
                     resources = self.backend.models[model_id].results[-idx]
                     if resources.loss is None or resources.results is None:
-                        #missing_input_vectores.append([model_id, cc_id, None])
-                        continue
+                        missing_input_vectores.append([model_id, None])
+                    else:
+                        input_vectors.append([model_id, resources.results['compute_class']['name']] + [resources.results['resources_measured'][resrc] for resrc in self.feature_resources])
+                        runtimes.append(resources.results['finish_time'] - resources.results['start_time'])
 
-                    input_vectors.append([model_id, resources.results['compute_class']['name']] + [resources.results['resources_measured'][resrc] for resrc in self.feature_resources])
-                    runtimes.append(resources.results['finish_time'] - resources.results['start_time'])
-
-            self.perceptron.update(input_vectors, runtimes)
-            self.perceptron.predict(input_vectors) # updates pred_queue
+            if input_vectors:
+                self.perceptron.update(input_vectors, runtimes)
+                self.perceptron.predict(input_vectors) # updates pred_queue
+            if missing_input_vectors:
+                self.perceptron.predict(missing_input_vectors) # updates pred_queue
             # now go an run the new predictions and return eventually with runtimes
 
         elif model_sort=='assign_all':

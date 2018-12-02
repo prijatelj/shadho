@@ -107,9 +107,12 @@ class Perceptron(object):
         """Handles multiple raw input vectors."""
         input_vectors = []
         for i in raw_input_vectors:
-            input_vector = np.append(np.append(self.model_id_to_onehot(i[0]), self.compute_class_to_onehot(i[1])),  i[2:]).reshape([1, -1])
-            input_vectors.append(self.normalize_input(input_vector))
-            # TODO possibly add custom error for caller to handle.
+            if i[1] is None: # if failed results exists, run average prediction.
+                input_vectors.append(self.param_averages[i[0]])
+            else:
+                input_vector = np.append(np.append(self.model_id_to_onehot(i[0]), self.compute_class_to_onehot(i[1])),  i[2:]).reshape([1, -1])
+                input_vectors.append(self.normalize_input(input_vector))
+                # TODO possibly add custom error for caller to handle.
         return input_vectors
 
     def handle_output(self, raw_output):
