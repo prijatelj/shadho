@@ -48,6 +48,13 @@ class Perceptron(object):
         self.sess = tf.Session()
         self.sess.run(self.init_op)
 
+    def is_pred_queue_empty(compute_class_id):
+        return self.pred_queue[compute_class_id]['queue'] is None
+
+    @property
+    def any_pred_queue_empty(self):
+        return any([self.is_pred_queue_empty(cc_id) for cc_id in self.compute_class_ids])
+
     def next_pred(self, compute_class_id):
         """Returns current value and moves pointer to next index."""
         pred = self.pred_queue[compute_class_id]['queue'][self.pred_queue[compute_class_id]['idx']] if self.pred_queue[compute_class_id]['queue'] else None
