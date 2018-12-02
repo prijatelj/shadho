@@ -48,7 +48,7 @@ class Perceptron(object):
         self.sess = tf.Session()
         self.sess.run(self.init_op)
 
-    def is_pred_queue_empty(compute_class_id):
+    def is_pred_queue_empty(self, compute_class_id):
         return self.pred_queue[compute_class_id]['queue'] is None
 
     @property
