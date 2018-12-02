@@ -491,7 +491,7 @@ class Shadho(object):
             # TODO
 
             # if initial run of Perceptron, set normals: defaults to np.ones()
-            if self.normalize_factors is None:
+            if self.perceptron.normalize_factors is None:
                 self.perceptron.set_normalize_factors(self.backend, self.feature_resources)
 
             # pull the recent models and turn into sample input + runtimes
