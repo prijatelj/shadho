@@ -100,7 +100,7 @@ class Perceptron(object):
         for model_id in shadho_backend.models: # every model
             for i, resource_id in enumerate(resources): # each resource
                 # iterate through model history, which == len(compute_class_ids)
-                for j in range(len(compute_class_ids)): # history
+                for j in range(len(self.compute_class_ids)): # history
                     normalize_factors[i] = np.maximum(shadho_backend.models[model_id].results[-j].results['resources_measured'][resource_id], normalize_factors[i])
 
         self.normalize_factors = normalize_factors
