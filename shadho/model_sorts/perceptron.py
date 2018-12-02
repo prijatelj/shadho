@@ -268,12 +268,17 @@ class Perceptron(object):
             #print(f"rl_vector: {rl_vector} | post_losses: {self.sess.run(tf.get_collection('losses'), feed_dict={self.reinforcement_penalties: rl_vector, self.network_input: input_vector})}")
 
     def predict(self, input_vectors):
-        print(input_vectors[0][0])
-        input_vectors = self.handle_input(input_vectors)
-        print(input_vectors[0][0])
+        models = [x[0] for x in input_vectors]
+
+        # NOTE using the averages of the input_vectors instead.
+        #print(input_vectors[0][0])
+        #input_vectors = self.handle_input(input_vectors)
+        #print(input_vectors[0][0])
         logit_list = []
-        for input_vector in input_vectors:
-            logit_list.append(self.sess.run(self.softmax_linear, feed_dict = {self.network_input : input_vector}))
+        #for input_vector in input_vectors:
+        for model_id in models:
+            logit_list.append(self.sess.run(self.softmax_linear, feed_dict = {self.network_input : self.param_averages[model_id]}))
+            #logit_list.append(self.sess.run(self.softmax_linear, feed_dict = {self.network_input : input_vector}))
         # outputs log probabilities, convert to non-log probabilities
         logit_list = [np.e ** logits / np.sum(np.e**logits) for logits in logit_list]
         logit_list = [np.squeeze(logits) for logits in logit_list]
