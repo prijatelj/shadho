@@ -518,7 +518,7 @@ class Shadho(object):
                     print('Inital update to perceptron has occured!')
             else:
                 no_input = True
-            if missing_input_vectors and None not in (self.perceptron.param_averages.values()):
+            if missing_input_vectors and not self.initial_generation:
                 self.perceptron.predict(missing_input_vectors) # updates pred_queue
             #elif no_input:
             #    if self.initial_generation: # if never updated, assign all again.

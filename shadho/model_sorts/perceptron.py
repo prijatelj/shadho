@@ -5,7 +5,7 @@ import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
-from IPython.core.debugger import Tracer
+#from IPython.core.debugger import Tracer
 
 class Perceptron(object):
     """
@@ -19,7 +19,6 @@ class Perceptron(object):
 
         # Create queue structure for circular queue of predictions.
         self.pred_queue = {cc_id:{'queue':None, 'idx':None, 'looped':None} for cc_id in compute_class_ids}
-        #self.pred_queue_idx = 0 added to pred_queue entirely
 
         self.model_ids = np.array(model_ids)
         self.compute_class_ids = np.array(compute_class_ids)
@@ -124,8 +123,7 @@ class Perceptron(object):
             #elif len(input_vector) != self.input_length: # should throw error
             #    return input_vector
         else:
-            Tracer()
-            input_vector[one_hot_size:] = input_vector[one_hot_size:] / normalize_factors
+            input_vector[:, one_hot_size:] = input_vector[:, one_hot_size:] / normalize_factors
 
         return input_vector
 
