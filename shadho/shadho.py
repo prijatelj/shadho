@@ -377,13 +377,13 @@ class Shadho(object):
             # Generate enough hyperparameters to fill the queue
             for i in range(n):
                 # Get bookkeeping ids and hyperparameter values
-                if not self.initial_generation and self.model_sort == 'perceptron':
+                if not self.initial_generation and self.model_sort == 'perceptron' and not self.perceptron.any_pred_queue_empty:
                     # run scheduler's specific model to cc assignments.
                     # pop from the pred_queue which is a python list
-                    if not self.perceptron.is_pred_queue_empty(cc_id):
-                        model_id, result_id, param = cc.generate(self.perceptron.next_pred(cc_id))
-                    else:
-                        model_id, result_id, param = cc.generate()
+                    #if not self.perceptron.is_pred_queue_empty(cc_id):
+                    model_id, result_id, param = cc.generate(self.perceptron.next_pred(cc_id))
+                    #else:
+                    #    model_id, result_id, param = cc.generate()
                 else:
                     model_id, result_id, param = cc.generate()
 
@@ -493,7 +493,7 @@ class Shadho(object):
             # if initial run of Perceptron, set normals: defaults to np.ones()
             if self.perceptron.normalize_factors is None:
                 #self.perceptron.set_normalize_factors(self.backend, self.feature_resources)
-                self.perceptron.set_normalize_factors(self.backend, self.feature_resources, [16, 16, 16, 12000, 50000]) # hardcoded maxes, uncertain w/ setup atm.
+                self.perceptron.set_normalize_factors(self.backend, self.feature_resources, [16.0, 16.0, 16000.0, 12000.0, 50000.0]) # hardcoded maxes, uncertain w/ setup atm.
 
             # pull the recent models and turn into sample input + runtimes
             input_vectors = []

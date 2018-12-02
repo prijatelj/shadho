@@ -113,10 +113,9 @@ class Perceptron(object):
                     for j in range(len(self.compute_class_ids)): # history
                         if shadho_backend.models[model_id].results[-j].results is not None:
                             normalize_factors[i] = np.maximum(shadho_backend.models[model_id].results[-j].results['resources_measured'][resource_id], normalize_factors[i])
-
-            self.normalize_factors = normalize_factors
+            self.normalize_factors = normalize_factors.astype(float)
         else:
-            self.normalize_factors = np.asarray(weights)
+            self.normalize_factors = np.asarray(weights, dtype=float)
 
     def normalize_input(self, input_vector, normalize_factors=None):
         """
@@ -250,6 +249,9 @@ class Perceptron(object):
         print('input vec')
         for input_vec in input_vectors:
             print(input_vec)
+        print('compute classes:')
+        for cc in self.compute_class_ids:
+            print(cc)
         input_vectors = self.handle_input(input_vectors)
         print('handled input vec')
         for input_vec in input_vectors:
@@ -322,5 +324,5 @@ class Perceptron(object):
         # Re-initialize the learner. Potentially a good idea to do periodically, as it has a bit of trouble climbing out of deep local minima
         self.sess.run(self.init_op)
 
-    def close():
+    def close(self):
         self.sess.close()
