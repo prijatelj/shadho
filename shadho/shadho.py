@@ -2,9 +2,7 @@
 
 Classes
 -------
-Shadho
-    Driver class for local and distributed hyperparameter optimization.
-"""
+Shadho Driver class for local and distributed hyperparameter optimization.  """
 from .config import ShadhoConfig
 from .hardware import ComputeClass
 from .managers import create_manager
@@ -128,6 +126,7 @@ class Shadho(object):
 
         # Store all memory necessary for sorting models dynamically.
         if model_sort == 'perceptron':
+            self.initial_generation = True
             print('SHADHO is using the perceptron model sort method.')
             self.init_model_sort = 'assign_all'
             self.feature_resources = ['cores', 'cores_avg', 'max_concurrent_processes', 'memory', 'virtual_memory']# tmp hardcoded values
@@ -186,9 +185,9 @@ class Shadho(object):
 
             # create the Perceptron()
             self.perceptron = model_sorts.perceptron.Perceptron(
-                intput_length,
+                input_length,
                 output_length,
-                model_ids = list(self.backend.keys()),
+                model_ids = list(self.backend.models.keys()),
                 compute_class_ids = list(self.ccs.keys())
             ) # TODO add SHADHO args to adjust default params of Perceptron
 
@@ -378,10 +377,10 @@ class Shadho(object):
             # Generate enough hyperparameters to fill the queue
             for i in range(n):
                 # Get bookkeeping ids and hyperparameter values
-                if self.model_sort == 'perceptron':
+                if not self.initial_generation and self.model_sort == 'perceptron':
                     # run scheduler's specific model to cc assignments.
                     # pop from the pred_queue which is a python list
-                    model_id, result_id, param = cc.generate(self.perceptron.next_pred[cc_id])
+                    model_id, result_id, param = cc.generate(self.perceptron.next_pred(cc_id))
                 else:
                     model_id, result_id, param = cc.generate()
 
@@ -402,6 +401,9 @@ class Shadho(object):
                         value=cc.value)
                     stop = False  # Ensure that the search continues
             cc.current_tasks = cc.max_tasks  # Update to show full queue
+
+            if self.initial_generation and self.model_sort == 'perceptron':
+                self.initial_generation = False
 
     def assign_to_ccs(self, override_model_sort=None):
         """Assign trees to compute classes.
