@@ -489,7 +489,8 @@ class Shadho(object):
 
             # if initial run of Perceptron, set normals: defaults to np.ones()
             if self.perceptron.normalize_factors is None:
-                self.perceptron.set_normalize_factors(self.backend, self.feature_resources)
+                #self.perceptron.set_normalize_factors(self.backend, self.feature_resources)
+                self.perceptron.set_normalize_factors(self.backend, self.feature_resources, [16, 16, 16, 12000, 50000]) # hardcoded maxes, uncertain w/ setup atm.
 
             # pull the recent models and turn into sample input + runtimes
             input_vectors = []
@@ -514,6 +515,7 @@ class Shadho(object):
                 no_input = False
                 if self.initial_generation:
                     self.initial_generation = False
+                    print('Inital update to perceptron has occured!')
             else:
                 no_input = True
             if missing_input_vectors and None not in (self.perceptron.param_averages.values()):

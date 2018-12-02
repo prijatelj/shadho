@@ -5,7 +5,7 @@ import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
-#from IPython.core.debugger import Tracer
+from IPython.core.debugger import Tracer
 
 class Perceptron(object):
     """
@@ -87,24 +87,26 @@ class Perceptron(object):
     def compute_class_to_onehot(self, compute_class):
         return (self.compute_class_ids == compute_class).astype(int)
 
-    def set_normalize_factors(self, shadho_backend, resources):
+    def set_normalize_factors(self, shadho_backend, resources, weights=None):
         """
         Given SHADHO backend and list of resources, get max of each resource
         feature.
         """
         # NOTE set normalize factors after initial run always.
         #normals_count = len(self.sess.run(self.network_input)) - (len(self.model_ids) + len(self.compute_class_ids))
+        if weights is None:
+            normalize_factors = np.ones(len(resources))
+            # find the max resource values across all models for initial run
+            for model_id in shadho_backend.models: # every model
+                for i, resource_id in enumerate(resources): # each resource
+                    # iterate through model history, which == len(compute_class_ids)
+                    for j in range(len(self.compute_class_ids)): # history
+                        if shadho_backend.models[model_id].results[-j].results is not None:
+                            normalize_factors[i] = np.maximum(shadho_backend.models[model_id].results[-j].results['resources_measured'][resource_id], normalize_factors[i])
 
-        normalize_factors = np.ones(len(resources))
-        # find the max resource values across all models for initial run
-        for model_id in shadho_backend.models: # every model
-            for i, resource_id in enumerate(resources): # each resource
-                # iterate through model history, which == len(compute_class_ids)
-                for j in range(len(self.compute_class_ids)): # history
-                    if shadho_backend.models[model_id].results[-j].results is not None:
-                        normalize_factors[i] = np.maximum(shadho_backend.models[model_id].results[-j].results['resources_measured'][resource_id], normalize_factors[i])
-
-        self.normalize_factors = normalize_factors
+            self.normalize_factors = normalize_factors
+        else:
+            self.normalize_factors = np.asarray(weights)
 
     def normalize_input(self, input_vector, normalize_factors=None):
         """
@@ -122,6 +124,7 @@ class Perceptron(object):
             #elif len(input_vector) != self.input_length: # should throw error
             #    return input_vector
         else:
+            Tracer()
             input_vector[one_hot_size:] = input_vector[one_hot_size:] / normalize_factors
 
         return input_vector
@@ -235,7 +238,13 @@ class Perceptron(object):
         """
         models = [x[0] for x in input_vectors]
         cc_ids = [x[1] for x in input_vectors]
+        print('input vec')
+        for input_vec in input_vectors:
+            print(input_vec)
         input_vectors = self.handle_input(input_vectors)
+        print('handled input vec')
+        for input_vec in input_vectors:
+            print(input_vec)
 
         for input_vector, output_vector, model, cc  in zip(input_vectors, shadho_output, models, cc_ids):
             output_vector = self.handle_output(output_vector)
