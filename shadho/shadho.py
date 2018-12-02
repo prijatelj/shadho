@@ -493,7 +493,7 @@ class Shadho(object):
             # if initial run of Perceptron, set normals: defaults to np.ones()
             if self.perceptron.normalize_factors is None:
                 #self.perceptron.set_normalize_factors(self.backend, self.feature_resources)
-                self.perceptron.set_normalize_factors(self.backend, self.feature_resources, [16.0, 16.0, 16000.0, 12000.0, 50000.0]) # hardcoded maxes, uncertain w/ setup atm.
+                self.perceptron.set_normalize_factors(self.backend, self.feature_resources, [16.0, 16000.0, 16.0, 12000.0, 50000.0]) # hardcoded maxes, uncertain w/ setup atm.
 
             # pull the recent models and turn into sample input + runtimes
             input_vectors = []
@@ -509,20 +509,41 @@ class Shadho(object):
                     if resources.loss is None or resources.results is None:
                         missing_input_vectors.append([model_id, None])
                     else:
-                        input_vectors.append([model_id, resources.results['compute_class']['name']] + [resources.results['resources_measured'][resrc] for resrc in self.feature_resources])
+                        input_vectors.append([model_id, resources.results['compute_class']['id']] + [resources.results['resources_measured'][resrc] for resrc in self.feature_resources])
                         runtimes.append(resources.results['finish_time'] - resources.results['start_time'])
+
+            print('perceptron pred queue:')
+            for key, value in self.perceptron.pred_queue.items():
+                print(key, ':', value)
 
             if input_vectors:
                 self.perceptron.update(input_vectors, runtimes)
+
+                #print('perceptron param_averages:')
+                #for key, value in self.perceptron.param_averages.items():
+                #    print(key, ':', value)
+
                 self.perceptron.predict(input_vectors) # updates pred_queue
                 no_input = False
                 if self.initial_generation:
                     self.initial_generation = False
                     print('Inital update to perceptron has occured!')
+
+                print('After update: perceptron pred queue:')
+                for key, value in self.perceptron.pred_queue.items():
+                    print(key, ':', value)
             else:
                 no_input = True
             if missing_input_vectors and not self.perceptron.any_pred_queue_empty:
+                print('missing input vectors used in prediction')
+                for missing in missing_input_vectors:
+                    print(missing)
+
                 self.perceptron.predict(missing_input_vectors) # updates pred_queue
+
+                print('After update: perceptron pred queue:')
+                for key, value in self.perceptron.pred_queue.items():
+                    print(key, ':', value)
             #elif no_input:
             #    if self.initial_generation: # if never updated, assign all again.
             #        for key in list(self.ccs.keys()):

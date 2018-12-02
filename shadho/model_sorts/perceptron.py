@@ -92,10 +92,12 @@ class Perceptron(object):
                     self.pred_queue[pred_cc]['looped'] = False
 
     def model_id_to_onehot(self, model_id):
-        return (self.model_ids == model_id).astype(int)
+        return (self.model_ids == model_id).astype(float)
+        #return (self.model_ids == model_id).astype(int)
 
     def compute_class_to_onehot(self, compute_class):
-        return (self.compute_class_ids == compute_class).astype(int)
+        return (self.compute_class_ids == compute_class).astype(float)
+        #return (self.compute_class_ids == compute_class).astype(int)
 
     def set_normalize_factors(self, shadho_backend, resources, weights=None):
         """
@@ -128,14 +130,15 @@ class Perceptron(object):
             normalize_factors = self.normalize_factors
 
         # assumes that there are more features than the 1 hot vectors
-        if self.input_length <= one_hot_size:
-            return input_vector
-            #elif len(input_vector) != self.input_length: # should throw error
-            #    return input_vector
-        else:
-            input_vector[:, one_hot_size:] = input_vector[:, one_hot_size:] / normalize_factors
+        #if self.input_length <= one_hot_size:
+        #    return input_vector
+        #    #elif len(input_vector) != self.input_length: # should throw error
+        #    #    return input_vector
+        #else:
+        input_vector = input_vector.astype(float)
+        input_vector[:, one_hot_size:] = input_vector[:, one_hot_size:] / normalize_factors
 
-        return input_vector
+        return input_vector.
 
     def handle_input(self, raw_input_vectors):
         """Handles multiple raw input vectors."""
@@ -145,7 +148,7 @@ class Perceptron(object):
                 input_vectors.append(self.param_averages[i[0]])
                 print('self.param_averages[i[0]]', self.param_averages[i[0]])
             else:
-                input_vector = np.append(np.append(self.model_id_to_onehot(i[0]), self.compute_class_to_onehot(i[1])),  i[2:]).reshape([1, -1])
+                input_vector = np.append(np.append(self.model_id_to_onehot(i[0]), self.compute_class_to_onehot(i[1])),  i[2:]).reshape([1, -1]).astype(float)
                 input_vectors.append(self.normalize_input(input_vector))
                 # TODO possibly add custom error for caller to handle.
         return input_vectors
@@ -290,17 +293,25 @@ class Perceptron(object):
             #print(f"rl_vector: {rl_vector} | post_losses: {self.sess.run(tf.get_collection('losses'), feed_dict={self.reinforcement_penalties: rl_vector, self.network_input: input_vector})}")
 
     def predict(self, input_vectors):
-        models = [x[0] for x in input_vectors]
+        print('predict: input vec:')
+        for input_vec in input_vectors:
+            print(input_vec)
 
-        # NOTE using the averages of the input_vectors instead.
-        #print(input_vectors[0][0])
-        #input_vectors = self.handle_input(input_vectors)
-        #print(input_vectors[0][0])
         logit_list = []
-        #for input_vector in input_vectors:
-        for model_id in models:
-            logit_list.append(self.sess.run(self.softmax_linear, feed_dict = {self.network_input : self.param_averages[model_id]}))
-            #logit_list.append(self.sess.run(self.softmax_linear, feed_dict = {self.network_input : input_vector}))
+        if self.param_averages[model_id] is not None:
+            # use the averages if exists
+            models = [x[0] for x in input_vectors]
+            for model_id in models:
+                    logit_list.append(self.sess.run(self.softmax_linear, feed_dict = {self.network_input : self.param_averages[model_id]}))
+        else:
+            # use the actual sample
+            input_vectors = self.handle_input(input_vectors)
+            print('predict handled input vec:')
+            for input_vec in input_vectors:
+                print(input_vec)
+
+            for input_vector in input_vectors:
+                logit_list.append(self.sess.run(self.softmax_linear, feed_dict = {self.network_input : input_vector}))
         # outputs log probabilities, convert to non-log probabilities
         logit_list = [np.e ** logits / np.sum(np.e**logits) for logits in logit_list]
         logit_list = [np.squeeze(logits) for logits in logit_list]
