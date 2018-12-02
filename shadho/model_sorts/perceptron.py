@@ -265,7 +265,7 @@ class Perceptron(object):
             rl_vector = (np.sign((self.time_averages[model] - output_vector)/self.time_averages[model] - 0.005) * self.compute_class_to_onehot(cc).reshape(1,-1))
 
             self.sess.run(self.train_op, feed_dict={self.reinforcement_penalties: rl_vector, self.network_input: self.param_averages[model]})
-            print(f"rl_vector: {rl_vector} | post_losses: {self.sess.run(tf.get_collection('losses'), feed_dict={self.reinforcement_penalties: rl_vector, self.network_input: input_vector})}")
+            #print(f"rl_vector: {rl_vector} | post_losses: {self.sess.run(tf.get_collection('losses'), feed_dict={self.reinforcement_penalties: rl_vector, self.network_input: input_vector})}")
 
     def predict(self, input_vectors):
         print(input_vectors[0][0])
