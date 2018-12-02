@@ -16,8 +16,10 @@ class Perceptron(object):
         self.input_length = input_length
         self.top_n = top_n
         self.epsilon = epsilon # epsilon for reinforcement learning decision making
-        self.pred_queue = [] # list of predictions from scheduler
-        self.pred_queue_idx = 0
+
+        # Create queue structure for circular queue of predictions.
+        self.pred_queue = {cc_id:{'queue':None, 'idx':None, 'looped':None} for cc_id in compute_class_ids}
+        #self.pred_queue_idx = 0 added to pred_queue entirely
 
         self.model_ids = np.array(model_ids)
         self.compute_class_ids = np.array(compute_class_ids)
@@ -30,9 +32,9 @@ class Perceptron(object):
         self.reinit_strikes = 0
 
 
-        self.param_averages = {x:None for x in model_ids}
-        self.time_averages = {x:None for x in model_ids}
-        self.reinit_time_averages = {x:None for x in model_ids}
+        self.param_averages = {m_id:None for m_id in model_ids}
+        self.time_averages = {m_id:None for m_id in model_ids}
+        self.reinit_time_averages = {m_id:None for m_id in model_ids}
 
         # placeholder for normalization factors of the non-one_hot features.
         self.normalize_factors = None
@@ -47,17 +49,37 @@ class Perceptron(object):
         self.sess = tf.Session()
         self.sess.run(self.init_op)
 
-    @property
-    def next_pred(self):
+    def next_pred(self, compute_class_id):
         """Returns current value and moves pointer to next index."""
-        pred = self.pred_queue[self.pred_queue_idx] if self.pred_queue else None
-        self.pred_queue_idx = 0 if self.pred_queue_idx >= len(self.pred_queue) else self.pred_queue_idx + 1
+        pred = self.pred_queue[compute_class_id]['queue'][self.pred_queue[compute_class_id]['idx']] if self.pred_queue[compute_class_id]['queue'] else None
+
+        if self.pred_queue[compute_class_id]['idx'] >= len(self.pred_queue[compute_class_id]['queue']):
+            self.pred_queue[compute_class_id]['idx'] = 0
+            if not self.pred_queue[compute_class_id]['looped']:
+                self.pred_queue[compute_class_id]['looped'] = True
+        else:
+            self.pred_queue[compute_class_id]['idx'] += 1
+
         return pred
 
     def update_pred_queue(self, preds):
         """Sets pred_queue to provided list of predictions."""
-        self.pred_queue = preds
-        self.pred_queue_idx = 0
+        # NOTE would be easier if it was cc to model in the fisrt place.
+        # loop through all predictions and assign them to proper queue.
+        for pred in preds:
+            model_id = pred[0]
+            for pred_cc in pred[1:]:
+                # if queue exists and has not fully looped, add to existing queue
+                if self.pred_queue[pred_cc]['queue'] and not self.pred_queue[pred_cc]['looped']:
+                    if self.pred_queue[pred_cc]['idx'] != 0:
+                        del self.pred_queue[pred_cc]['queue'][:self.pred_queue[pred_cc]['idx']]
+                        self.pred_queue[pred_cc]['idx'] = 0
+
+                    self.pred_queue[pred_cc]['queue'].append(model_id)
+                else: # if DNE or looped, create the queue, reset idx and looped
+                    self.pred_queue[pred_cc]['queue'] = [model_id]
+                    self.pred_queue[pred_cc]['idx'] = 0
+                    self.pred_queue[pred_cc]['looped'] = False
 
     def model_id_to_onehot(self, model_id):
         return (self.model_ids == model_id).astype(int)
@@ -261,8 +283,12 @@ class Perceptron(object):
         return logit_list, preds
 
     def generate_schedule(self, input_vectors, logit_list):
-        # TODO deterministic decision
-        # top 2 models per ccs
+        """
+        :return: list of lists: [model_id, cc_id1, cc_id2, ...] The cc_ids for each model to go.
+        """
+        # NOTE Could just update the pred_queue specific to each cc!
+
+        # top 1 models per ccs
         print('input_vectors len = ',len(input_vectors), ' 1st 10 = ', input_vectors[:10])
         print('logit_list len = ', len(logit_list), ' 1st 10 = ', logit_list[:10])
         return [np.append(self.model_ids[np.where(x[0][0:len(self.model_ids)])[0][0]], self.compute_class_ids[np.argsort(y)[::-1][:self.top_n] if (np.random.uniform() > self.epsilon) else np.random.choice(range(len(self.compute_class_ids)))]) for x,y in zip(input_vectors,logit_list)]

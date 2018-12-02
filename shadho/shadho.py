@@ -381,7 +381,7 @@ class Shadho(object):
                 if self.model_sort == 'perceptron':
                     # run scheduler's specific model to cc assignments.
                     # pop from the pred_queue which is a python list
-                    model_id, result_id, param = cc.generate(self.perceptron.next_pred)
+                    model_id, result_id, param = cc.generate(self.perceptron.next_pred[cc_id])
                 else:
                     model_id, result_id, param = cc.generate()
 
