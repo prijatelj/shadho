@@ -325,7 +325,7 @@ class Perceptron(object):
                 del_input_vector.append(i)
 
         # if any random guesses occurred, remove bad inputs.
-        for i in del_input_vector:
+        for i in sorted(del_input_vector, reverse=True):
             del input_vectors[i]
 
         # outputs log probabilities, convert to non-log probabilities
