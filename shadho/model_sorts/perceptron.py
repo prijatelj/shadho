@@ -309,6 +309,7 @@ class Perceptron(object):
 
         logit_list = []
         random_guess = []
+        del_input_vector = []
 
         # loop through input provided and make predictions
         for i, model_id in enumerate(models):
@@ -321,6 +322,11 @@ class Perceptron(object):
             else:
                 # No input information so random guess
                 random_guess.append(np.append(model_id, np.random.choice(self.compute_class_ids, size=self.top_n, replace=False)))
+                del_input_vector.append(i)
+
+        # if any random guesses occurred, remove bad inputs.
+        for i in del_input_vector:
+            del input_vectors[i]
 
         # outputs log probabilities, convert to non-log probabilities
         logit_list = [np.e ** logits / np.sum(np.e**logits) for logits in logit_list]
