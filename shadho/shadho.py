@@ -513,7 +513,7 @@ class Shadho(object):
             for key, value in self.perceptron.pred_queue.items():
                 print(key, ':', value)
 
-            if input_vectors:
+            if len(input_vectors) > 0:
                 self.perceptron.update(input_vectors, runtimes)
 
                 #print('perceptron param_averages:')
@@ -531,7 +531,8 @@ class Shadho(object):
                     print(key, ':', value)
             else:
                 no_input = True
-            if missing_input_vectors and not self.perceptron.any_pred_queue_empty:
+            if len(missing_input_vectors) > 0:
+                # Make predictions on the failed runs of models
                 print('missing input vectors used in prediction')
                 for missing in missing_input_vectors:
                     print(missing)

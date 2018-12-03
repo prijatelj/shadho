@@ -141,7 +141,10 @@ class Perceptron(object):
         return input_vector
 
     def handle_input(self, raw_input_vectors):
-        """Handles multiple raw input vectors."""
+        """
+        Handles multiple raw input vectors.
+        :return: changes the list of raw input into param averages, convert the input, or None if param averages is None.
+        """
         input_vectors = []
         for i in raw_input_vectors:
             if i[1] is None: # if failed results exists, run average prediction.
@@ -305,21 +308,28 @@ class Perceptron(object):
             print(input_vec)
 
         logit_list = []
+        random_guess = []
 
         # loop through input provided and make predictions
         for i, model_id in enumerate(models):
             if self.param_averages[model_id] is not None:
                 # use the averages if exists
                     logit_list.append(self.sess.run(self.softmax_linear, feed_dict = {self.network_input : self.param_averages[model_id]}))
-            else:
+            elif input_vectors[i] is not None: #TODO check if valid input
                 # use the actual sample
                 logit_list.append(self.sess.run(self.softmax_linear, feed_dict = {self.network_input : input_vectors[i]}))
+            else:
+                # No input information so random guess
+                random_guess.append(np.append(model_id, np.random.choice(self.compute_class_ids, size=self.top_n, replace=False)))
 
         # outputs log probabilities, convert to non-log probabilities
         logit_list = [np.e ** logits / np.sum(np.e**logits) for logits in logit_list]
         logit_list = [np.squeeze(logits) for logits in logit_list]
 
         preds = self.generate_schedule(input_vectors, logit_list)
+        if len(random_guess) > 0:
+            # append random_guess to predictions.
+            preds += random_guess
         self.update_pred_queue(preds)
         return logit_list, preds
 
