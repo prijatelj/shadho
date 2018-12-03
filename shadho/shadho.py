@@ -377,13 +377,10 @@ class Shadho(object):
             # Generate enough hyperparameters to fill the queue
             for i in range(n):
                 # Get bookkeeping ids and hyperparameter values
-                if not self.initial_generation and self.model_sort == 'perceptron' and not self.perceptron.any_pred_queue_empty:
+                if not self.initial_generation and self.model_sort == 'perceptron' and not self.perceptron.is_pred_queue_empty(cc_id):
                     # run scheduler's specific model to cc assignments.
                     # pop from the pred_queue which is a python list
-                    #if not self.perceptron.is_pred_queue_empty(cc_id):
                     model_id, result_id, param = cc.generate(self.perceptron.next_pred(cc_id))
-                    #else:
-                    #    model_id, result_id, param = cc.generate()
                 else:
                     model_id, result_id, param = cc.generate()
 
